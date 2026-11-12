@@ -436,44 +436,6 @@ window.__ModuleLoader__.load({
       return Array.isArray(value) ? value : [];
     }
 
-    /** Unknown = arguments still streaming; null = no usable arguments. */
-    function parseArguments(raw) {
-      if (typeof raw !== 'string') return null;
-      const source = raw.trim();
-      if (!source) return null;
-      try {
-        const value = JSON.parse(source);
-        return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
-      } catch (error) {
-        return undefined;
-      }
-    }
-
-    function specOf(block) {
-      if (!block || typeof block !== 'object') return null;
-      const call = block.call && typeof block.call === 'object' ? block.call : null;
-
-      // 1) Raw JSON strings: the Tool call keeps the exact arguments the model sent.
-      const raws = [block.argsRaw, call && call.argsRaw, block.args, call && call.args];
-      for (let index = 0; index < raws.length; index += 1) {
-        const value = raws[index];
-        if (typeof value !== 'string') continue;
-        const parsed = parseArguments(value);
-        if (parsed) return parsed;
-      }
-
-      // 2) Plain objects that actually look like a card. A lazy `args` accessor has
-      // neither `blocks` nor `title`, so it is ignored instead of rendering a blank card.
-      const objects = [block.args, call && call.args, block];
-      for (let index = 0; index < objects.length; index += 1) {
-        const value = objects[index];
-        if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
-        if (Array.isArray(value.blocks) || typeof value.title === 'string') return value;
-      }
-
-      return null;
-    }
-
     function paragraphs(value, key) {
       const parts = text(value)
         .split(/\n+/)
@@ -655,17 +617,6 @@ window.__ModuleLoader__.load({
       if (type === 'divider') return h('hr', { className: 'rc-div', key });
 
       return null;
-    }
-
-    function Skeleton() {
-      return h(
-        'div',
-        { className: 'rc-card rc-skeleton', 'data-accent': 'indigo', 'aria-hidden': 'true' },
-        h('div', { className: 'rc-skel-line', style: { width: '38%' } }),
-        h('div', { className: 'rc-skel-line', style: { width: '74%', height: '14px' } }),
-        h('div', { className: 'rc-skel-line', style: { width: '88%' } }),
-        h('div', { className: 'rc-skel-line', style: { width: '62%', marginBottom: 0 } }),
-      );
     }
 
     function Card(props) {
