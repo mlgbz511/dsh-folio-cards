@@ -7,6 +7,8 @@
  * (MALFORMED_RESPONSE), while a malformed fence merely stays visible as source.
  */
 
+import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs';
+import { join } from 'node:path';
 import Schema from '@deepseek-ai/schemastery';
 
 const REGISTER_TOOL = false;
@@ -137,6 +139,32 @@ function depthOf(config) {
 
 function guideFor(depth) {
   return BASE_GUIDE.concat(DEPTH_GUIDE[depth] || DEPTH_GUIDE.auto).join('\n');
+}
+
+/** 从 cordis.patch.yml 文本里读本插件的 depth；读不到或非法一律返回 null。 */
+export function depthInPatch(text) {
+  if (typeof text !== 'string') return null;
+  const hit = /- id:\s*folio-cards\b[\s\S]{0,240}?depth:\s*([A-Za-z]+)/.exec(text);
+  if (!hit) return null;
+  const value = hit[1].toLowerCase();
+  return DEPTHS.indexOf(value) >= 0 ? value : null;
+}
+
+/** 找出本机提到本插件的 patch 文件；一个都没有时返回空数组。 */
+export function patchFiles() {
+  const home = process.env.USERPROFILE || process.env.HOME || '';
+  const profiles = join(home, '.dsh', 'profiles');
+  const found = [];
+  try {
+    for (const name of readdirSync(profiles)) {
+      const file = join(profiles, name, 'cordis.patch.yml');
+      try {
+        if (!existsSync(file) || !statSync(file).isFile()) continue;
+        if (readFileSync(file, 'utf8').includes('dsh-folio-cards')) found.push(file);
+      } catch (error) {}
+    }
+  } catch (error) {}
+  return found;
 }
 
 const PARAMETERS = {
@@ -366,13 +394,50 @@ export function apply(ctx, config) {
     'dsh-folio-cards: rich_card tool',
   );
 
-  ctx.effect(
-    () =>
-      ctx.systemPrompt.section({
-        name: 'folio-cards',
-        order: 34,
-        text: guideFor(depth),
+  // 提示词区段可热重挂：改 patch 里的 depth 后不必重启 App。
+  const live = { depth: depthOf(config), dispose: null };
+  const mount = () => {
+    if (live.dispose) live.dispose();
+    live.dispose = ctx.systemPrompt.section({
+      name: 'folio-cards',
+      order: 34,
+      text: guideFor(live.depth),
+    });
+  };
+
+  ctx.effect(() => {
+    mount();
+    return () => {
+      if (live.dispose) {
+        live.dispose();
+        live.dispose = null;
+      }
+    };
+  }, 'dsh-folio-cards: prompt guidance');
+
+  ctx.effect(() => {
+    let timer = null;
+    const watchers = patchFiles().map((file) =>
+      watch(file, { persistent: false }, () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          let text = '';
+          try {
+            text = readFileSync(file, 'utf8');
+          } catch (error) {
+            return;
+          }
+          const next = depthInPatch(text);
+          if (next && next !== live.depth) {
+            live.depth = next;
+            mount();
+          }
+        }, 250);
       }),
-    'dsh-folio-cards: prompt guidance',
-  );
+    );
+    return () => {
+      if (timer) clearTimeout(timer);
+      for (const watcher of watchers) watcher.close();
+    };
+  }, 'dsh-folio-cards: depth watch');
 }
