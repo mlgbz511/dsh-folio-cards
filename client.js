@@ -1448,13 +1448,32 @@ window.__ModuleLoader__.load({
     function probeSection(ctx) {
       function Panel() {
         const [out, setOut] = React.useState('idle');
-        const remoteOf = () => ctx.remote || (ctx.api && ctx.api.remote) || null;
+        // 访问未 inject 的服务会抛异常，探针自己必须兜住
+        const remoteOf = () => {
+          try {
+            return ctx.remote || (ctx.api && ctx.api.remote) || null;
+          } catch (error) {
+            return null;
+          }
+        };
+        const safe = (label, fn) => {
+          try {
+            return label + ': ' + fn();
+          } catch (error) {
+            return label + ' ERR ' + String((error && error.message) || error);
+          }
+        };
         const report = () => {
-          const lines = ['ctx keys: ' + Object.keys(ctx).join(',')];
+          const lines = ['PROBE ALIVE'];
           const remote = remoteOf();
-          lines.push('remote: ' + (remote ? Object.keys(remote).join(',') : 'unavailable'));
-          const pm = remote && remote.pluginManager;
-          lines.push('pluginManager: ' + (pm ? Object.keys(pm).join(',') : 'unavailable'));
+          lines.push(safe('ctx keys', () => Object.keys(ctx).join(',')));
+          lines.push(safe('remote', () => (remote ? Object.keys(remote).join(',') : 'unavailable')));
+          lines.push(
+            safe('pluginManager', () => {
+              const pm = remote && remote.pluginManager;
+              return pm ? Object.keys(pm).join(',') : 'unavailable';
+            }),
+          );
           return lines.join('\n');
         };
         const run = (label, args) => {
@@ -1546,6 +1565,7 @@ window.__ModuleLoader__.load({
                       id: 'folio-depth-probe',
                       order: 60,
                       label: () => 'Folio 深度探针',
+                      inject: () => ({}),
                     },
                     probeSection(ctx),
                   ),
