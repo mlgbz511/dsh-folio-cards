@@ -68,3 +68,47 @@ assert.equal(tableSpec({ rows: [] }), null);
 assert.equal(Table({ block: { headers: [], rows: [] } }), null);
 
 console.log('TABLE-OK');
+
+// ---- code / verdict ----
+const { codeSpec, tokenizeCode, CodeBlock, VerdictBlock } = api.__test;
+
+// 25 行不截断，只给内部滚动
+const long = { language: 'js', code: Array.from({ length: 25 }, (_, i) => 'const v' + i + ' = ' + i + ';').join('\n') };
+const longSpec = codeSpec(long);
+assert.equal(longSpec.rawLines.length, 25, 'long code is not truncated');
+assert.equal(longSpec.scroll, true, 'long code scrolls inside the block');
+assert.equal(longSpec.showNumbers, true, 'long code shows line numbers');
+
+// 行号阈值
+assert.equal(codeSpec({ code: 'a\nb' }).showNumbers, false, 'short code hides line numbers');
+assert.equal(codeSpec({ code: Array.from({ length: 13 }, () => 'x').join('\n') }).showNumbers, true, '13 lines turns numbers on');
+
+// # 只在 shell/python 一类里算注释
+const cTokens = tokenizeCode('#include <x.h>', 'c');
+assert.equal(cTokens.some((t) => t.t === 'c'), false, 'C preprocessor line is not a comment');
+const pyComment = tokenizeCode('# note', 'python');
+assert.equal(pyComment[0].t, 'c', 'python hash starts a comment');
+
+// 字符串里的 # 不染成注释
+const pyString = tokenizeCode('x = "a # b"', 'python');
+assert.ok(pyString.some((t) => t.t === 's' && t.v.includes('#')), 'hash inside a string stays a string');
+
+// 渲染骨架
+const codeTree = CodeBlock({ block: { language: 'js', code: 'const a = 1;\nreturn a;', highlight: [2] } });
+const pres = all(codeTree, (n) => n.type === 'pre');
+assert.equal(pres.length, 1, 'code block renders one pre');
+const langNode = all(codeTree, (n) => n.props.className === 'rc-code-lang')[0];
+assert.equal(langNode.kids[0], 'js', 'language label is rendered');
+const copy = all(codeTree, (n) => n.type === 'button')[0];
+assert.equal(copy.props['aria-label'], 'Copy code', 'copy button is labelled');
+assert.equal(all(codeTree, (n) => n.props['data-hl'] === '1').length, 1, 'highlighted line is marked');
+assert.ok(all(codeTree, (n) => n.props.className === 'tk-k').length > 0, 'keywords are tinted');
+
+// verdict
+assert.equal(VerdictBlock({ block: {} }), null, 'empty verdict renders nothing');
+const vTree = VerdictBlock({ block: { text: '根因是 CORS 预检失败。' } });
+assert.equal(vTree.props['data-tone'], 'warn', 'verdict defaults to warn');
+const vLabel = all(vTree, (n) => n.props.className === 'rc-verdict-t')[0];
+assert.equal(vLabel.kids[0], '核心问题', 'verdict label defaults to 核心问题');
+console.log('CODE-OK');
+console.log('VERDICT-OK');

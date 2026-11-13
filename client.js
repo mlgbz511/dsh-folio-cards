@@ -508,6 +508,116 @@ window.__ModuleLoader__.load({
   .rc-table-shell[data-fold='1'] .rc-table-group td { display: block; }
 
 }
+/* 代码块：等宽、语言标签、可选行号、复制；无渐变、无发光。 */
+.rc-code {
+  margin: 14px 0 8px;
+  border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 3%, var(--dsw-alias-bg-layer-1));
+}
+.rc-code-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
+}
+.rc-code-lang {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-secondary);
+}
+.rc-code-title {
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rc-code-copy {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease;
+}
+.rc-code-copy:hover { color: var(--dsw-alias-label-primary); background: color-mix(in oklab, var(--dsw-alias-label-primary) 6%, transparent); }
+.rc-code-copy:active { background: color-mix(in oklab, var(--dsw-alias-label-primary) 11%, transparent); }
+.rc-code-copy:focus-visible { outline: 2px solid var(--rc-accent); outline-offset: 2px; }
+.rc-code-copy[data-copied='1'] { color: var(--dsw-alias-state-success-primary); }
+.rc-code pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+}
+.rc-code-scroll pre { max-height: 320px; }
+.rc-code code {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--dsw-alias-label-primary);
+  white-space: pre;
+  tab-size: 2;
+}
+.rc-code[data-lines='1'] code { counter-reset: rc-line; }
+.rc-line { display: block; }
+.rc-code[data-lines='1'] .rc-line::before {
+  counter-increment: rc-line;
+  content: counter(rc-line);
+  display: inline-block;
+  width: 2.2em;
+  margin-right: 10px;
+  text-align: right;
+  color: color-mix(in oklab, var(--dsw-alias-label-primary) 38%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.rc-line[data-hl='1'] { background: color-mix(in oklab, var(--rc-accent) 10%, transparent); }
+.tk-c { color: color-mix(in oklab, var(--dsw-alias-label-primary) 48%, transparent); font-style: italic; }
+.tk-s { color: var(--dsw-alias-state-success-primary); }
+.tk-n { color: var(--dsw-alias-state-warning-primary); }
+.tk-k { color: var(--rc-accent); }
+/* 核心问题块：强调轨 + 色块标签，圆角刻意比卡片更方，制造层级差。 */
+.rc-verdict {
+  margin: 14px 0 12px;
+  padding: 13px 16px 14px;
+  border-left: 4px solid var(--dsw-alias-state-warning-primary);
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--dsw-alias-state-warning-primary) 9%, var(--dsw-alias-bg-layer-1));
+}
+.rc-verdict-t {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--dsw-alias-state-warning-primary) 22%, transparent);
+  color: var(--dsw-alias-label-primary);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.rc-verdict p {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--dsw-alias-label-primary);
+}
+.rc-verdict[data-tone='info'] { border-left-color: var(--rc-accent); background: color-mix(in oklab, var(--rc-accent) 9%, var(--dsw-alias-bg-layer-1)); }
+.rc-verdict[data-tone='info'] .rc-verdict-t { background: color-mix(in oklab, var(--rc-accent) 20%, transparent); }
+.rc-verdict[data-tone='tip'] { border-left-color: var(--dsw-alias-state-success-primary); background: color-mix(in oklab, var(--dsw-alias-state-success-primary) 9%, var(--dsw-alias-bg-layer-1)); }
+.rc-verdict[data-tone='tip'] .rc-verdict-t { background: color-mix(in oklab, var(--dsw-alias-state-success-primary) 20%, transparent); }
+
 @media (prefers-reduced-motion: reduce) {
   .rc-card { animation: none; }
   .rc-skel-line { animation: none; }
@@ -706,6 +816,207 @@ window.__ModuleLoader__.load({
       return h(Table, { key: key, block: block });
     }
 
+    // ponytail: 轻量着色，只认注释/字符串/数字/关键字。要真词法分析就换 shiki，那时才值得加依赖。
+    const CODE_KEYWORDS = /^(?:const|let|var|function|return|if|else|for|while|class|import|from|export|default|def|fn|pub|use|struct|impl|async|await|try|catch|throw|new|typeof|in|is|not|and|or|None|True|False|null|true|false|self|this)$/;
+    const HASH_COMMENT_LANGS = /^(?:sh|bash|zsh|shell|console|python|py|yaml|yml|ruby|rb|toml|ini|conf|makefile|dockerfile|ps1|powershell|r|perl|pl)$/i;
+
+    function tokenizeCode(code, language) {
+      const hashComment = HASH_COMMENT_LANGS.test(String(language || ''));
+      const out = [];
+      const push = (type, value) => {
+        if (type === 'text' && out.length > 0 && out[out.length - 1].t === 'text') {
+          out[out.length - 1].v += value;
+          return;
+        }
+        out.push({ t: type, v: value });
+      };
+      let i = 0;
+      while (i < code.length) {
+        const ch = code[i];
+        const two = code.slice(i, i + 2);
+        if (two === '//' || (hashComment && ch === '#')) {
+          const end = code.indexOf('\n', i);
+          const stop = end === -1 ? code.length : end;
+          push('c', code.slice(i, stop));
+          i = stop;
+          continue;
+        }
+        if (two === '/*') {
+          const end = code.indexOf('*/', i + 2);
+          const stop = end === -1 ? code.length : end + 2;
+          push('c', code.slice(i, stop));
+          i = stop;
+          continue;
+        }
+        if (ch === '"' || ch === "'" || ch === '`') {
+          let j = i + 1;
+          while (j < code.length) {
+            if (code[j] === '\\') {
+              j += 2;
+              continue;
+            }
+            if (code[j] === ch) {
+              j += 1;
+              break;
+            }
+            if (ch !== '`' && code[j] === '\n') break;
+            j += 1;
+          }
+          push('s', code.slice(i, j));
+          i = j;
+          continue;
+        }
+        if (ch >= '0' && ch <= '9' && !/[A-Za-z0-9_$]/.test(code[i - 1] || '')) {
+          let j = i;
+          while (j < code.length && /[0-9a-fA-FxXoObB._]/.test(code[j])) j += 1;
+          push('n', code.slice(i, j));
+          i = j;
+          continue;
+        }
+        if (/[A-Za-z_$]/.test(ch)) {
+          let j = i;
+          while (j < code.length && /[A-Za-z0-9_$]/.test(code[j])) j += 1;
+          const word = code.slice(i, j);
+          push(CODE_KEYWORDS.test(word) ? 'k' : 'text', word);
+          i = j;
+          continue;
+        }
+        push('text', ch);
+        i += 1;
+      }
+      return out;
+    }
+
+    function codeSpec(block) {
+      const language = text(block.language) || 'text';
+      const source = Array.isArray(block.code)
+        ? block.code.map((line) => text(line)).join('\n')
+        : text(block.code);
+      if (!source) return null;
+      const rawLines = source.replace(/\r\n/g, '\n').split('\n');
+      const lineCount = rawLines.length;
+      const lines = block.lines === false ? false : block.lines === true ? true : lineCount > 12;
+      const highlight = new Set(
+        list(block.highlight)
+          .map((n) => Number(n))
+          .filter((n) => Number.isFinite(n)),
+      );
+      return {
+        language,
+        rawLines,
+        lineCount,
+        showNumbers: lines,
+        scroll: lineCount > 12,
+        title: text(block.title),
+        highlight,
+      };
+    }
+
+    function copyCode(value, button) {
+      const done = () => {
+        if (!button || !button.setAttribute) return;
+        button.setAttribute('data-copied', '1');
+        setTimeout(() => button.setAttribute('data-copied', '0'), 1200);
+      };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(value).then(done, () => {});
+          return;
+        }
+      } catch (error) {
+        /* 掉到下面的兜底 */
+      }
+      try {
+        const area = document.createElement('textarea');
+        area.value = value;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        document.execCommand('copy');
+        document.body.removeChild(area);
+        done();
+      } catch (error) {
+        /* 两条路都断就静默，别弹窗骚扰 */
+      }
+    }
+
+    function CodeBlock(props) {
+      const spec = codeSpec(props.block);
+      if (!spec) return null;
+      const tokens = tokenizeCode(spec.rawLines.join('\n'), spec.language);
+      const lines = [[]];
+      for (const token of tokens) {
+        const parts = token.v.split('\n');
+        for (let k = 0; k < parts.length; k += 1) {
+          if (k > 0) lines.push([]);
+          if (parts[k] !== '') lines[lines.length - 1].push({ t: token.t, v: parts[k] });
+        }
+      }
+      const body = h(
+        'code',
+        null,
+        lines.map((lineTokens, index) =>
+          h(
+            'span',
+            {
+              key: index,
+              className: 'rc-line',
+              'data-hl': spec.highlight.has(index + 1) ? '1' : null,
+            },
+            lineTokens.length === 0
+              ? ' '
+              : lineTokens.map((token, k) =>
+                  h(
+                    'span',
+                    { key: k, className: token.t === 'text' ? null : 'tk-' + token.t },
+                    token.v,
+                  ),
+                ),
+          ),
+        ),
+      );
+      return h(
+        'div',
+        {
+          className: 'rc-code' + (spec.scroll ? ' rc-code-scroll' : ''),
+          'data-lines': spec.showNumbers ? '1' : '0',
+        },
+        h(
+          'div',
+          { className: 'rc-code-head' },
+          h('span', { className: 'rc-code-lang' }, spec.language),
+          spec.title ? h('span', { className: 'rc-code-title' }, spec.title) : null,
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'rc-code-copy',
+              'aria-label': 'Copy code',
+              onClick: (event) => copyCode(spec.rawLines.join('\n'), event.currentTarget),
+            },
+            'Copy',
+          ),
+        ),
+        h('pre', null, body),
+      );
+    }
+
+    function VerdictBlock(props) {
+      const block = props.block;
+      const body = text(block.text !== undefined ? block.text : block.paragraph);
+      if (!body) return null;
+      const tone = ['warn', 'info', 'tip'].indexOf(text(block.tone)) >= 0 ? text(block.tone) : 'warn';
+      const label = text(block.title) || '核心问题';
+      return h(
+        'aside',
+        { className: 'rc-verdict', 'data-tone': tone },
+        h('div', { className: 'rc-verdict-t' }, label),
+        h('p', null, body),
+      );
+    }
+
     function Figure(props) {
       const url = text(props.url);
       const alt = text(props.alt);
@@ -809,6 +1120,10 @@ window.__ModuleLoader__.load({
       }
 
       if (type === 'table') return renderTable(block, key);
+
+      if (type === 'code') return h(CodeBlock, { key: key, block: block });
+
+      if (type === 'verdict') return h(VerdictBlock, { key: key, block: block });
 
       if (type === 'callout') {
         const title = text(block.title);
@@ -1130,7 +1445,15 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       // 供 tests/table.test.mjs 断言的纯函数出口；浏览器里没人读它。
-      __test: { tableSpec: tableSpec, Table: Table, Card: Card },
+      __test: {
+        tableSpec: tableSpec,
+        Table: Table,
+        Card: Card,
+        codeSpec: codeSpec,
+        tokenizeCode: tokenizeCode,
+        CodeBlock: CodeBlock,
+        VerdictBlock: VerdictBlock,
+      },
       apply(ctx) {
         const style = document.createElement('style');
         style.setAttribute('data-dsh-folio-cards', '');

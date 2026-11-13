@@ -24,6 +24,8 @@ dsh plugin --profile <你的 profile> add link:<本仓库绝对路径>
 | `timeline` | 带日期的事件线 |
 | `image` | 真图 URL + 说明 + 来源 |
 | `table` | 多列对照表（本项目新增） |
+| `code` | 代码匣：语言标签、复制、超 12 行自动行号与限高 |
+| `verdict` | 核心问题块：一句话主因，放在卡片最上方 |
 | `divider` | 分隔线 |
 
 ## table 块
@@ -81,8 +83,8 @@ GUIDE（宿主注入的系统提示段）规定：
 
 | | 上游 `dsh-rich-cards` | 本仓库 `dsh-folio-cards` |
 | --- | --- | --- |
-| 包名 / 版本 | `dsh-rich-cards` 1.2.4 | `dsh-folio-cards` 2.0.0 |
-| 块类型 | 12 | 13（+`table`）|
+| 包名 / 版本 | `dsh-rich-cards` 1.2.4 | `dsh-folio-cards` 2.1.0 |
+| 块类型 | 12 | 15（+`table` +`code` +`verdict`）|
 | 表格 | 无，只能 `kv` 两列 | V5 网格 + sticky 首列 + 数值对齐 + 吸顶 + 窄屏折叠 |
 | 提示词 | 无表格判据 | 3×3 强制用表 + 最小示例 |
 | 测试 | 无 | `tests/table.test.mjs`（6 组断言，`node tests/table.test.mjs`）|
