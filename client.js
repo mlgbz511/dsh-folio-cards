@@ -1442,6 +1442,59 @@ window.__ModuleLoader__.load({
       };
     }
 
+    // ponytail: 临时探针，用来判定“客户端能否把 depth 写回宿主配置”。验证完删掉。
+    const PROBE = true;
+
+    function probeSection(ctx) {
+      function Panel() {
+        const [out, setOut] = React.useState('idle');
+        const remoteOf = () => ctx.remote || (ctx.api && ctx.api.remote) || null;
+        const report = () => {
+          const lines = ['ctx keys: ' + Object.keys(ctx).join(',')];
+          const remote = remoteOf();
+          lines.push('remote: ' + (remote ? Object.keys(remote).join(',') : 'unavailable'));
+          const pm = remote && remote.pluginManager;
+          lines.push('pluginManager: ' + (pm ? Object.keys(pm).join(',') : 'unavailable'));
+          return lines.join('\n');
+        };
+        const run = (label, args) => {
+          setOut(label + ' -> 请求中…');
+          try {
+            const remote = remoteOf();
+            const pm = remote && remote.pluginManager;
+            const fn = pm && pm.updateBundle;
+            if (typeof fn !== 'function') {
+              setOut(label + ' -> updateBundle 不可用');
+              return;
+            }
+            Promise.resolve(fn.call(pm, args)).then(
+              (res) => setOut(label + ' -> OK ' + JSON.stringify(res).slice(0, 400)),
+              (error) => setOut(label + ' -> ERR ' + String((error && error.message) || error).slice(0, 300)),
+            );
+          } catch (error) {
+            setOut(label + ' -> THROW ' + String((error && error.message) || error).slice(0, 300));
+          }
+        };
+        const btn = (text, onClick) =>
+          h('button', { type: 'button', onClick, style: { marginRight: '8px' } }, text);
+        return h(
+          'div',
+          null,
+          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针'),
+          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '12px' } }, report()),
+          h(
+            'div',
+            { style: { margin: '10px 0' } },
+            btn('A: {id, config}', () => run('A', { id: 'folio-cards', config: { depth: 'verbose' } })),
+            btn('B: {id, depth}', () => run('B', { id: 'folio-cards', depth: 'verbose' })),
+            btn('C: {name, config}', () => run('C', { name: 'dsh-folio-cards', config: { depth: 'verbose' } })),
+          ),
+          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '12px' } }, out),
+        );
+      }
+      return Panel;
+    }
+
     return {
       inject: ['slots'],
       // 供 tests/table.test.mjs 断言的纯函数出口；浏览器里没人读它。
@@ -1481,6 +1534,28 @@ window.__ModuleLoader__.load({
         );
 
         ctx.effect(() => installCardFences(), 'dsh-folio-cards: card fences');
+
+        if (PROBE) {
+          try {
+            ctx.effect(
+              () =>
+                ctx.slots.inject('settings.section', () =>
+                  ctx.slots.register(
+                    {
+                      name: 'settings.section',
+                      id: 'folio-depth-probe',
+                      order: 60,
+                      label: () => 'Folio 深度探针',
+                    },
+                    probeSection(ctx),
+                  ),
+                ),
+              'dsh-folio-cards: depth probe',
+            );
+          } catch (error) {
+            /* 探针挂不上也不能拖垮卡片 */
+          }
+        }
 
         ctx.effect(() =>
           ctx.slots.inject('tool.call.toolview', () =>
