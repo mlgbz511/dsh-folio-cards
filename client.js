@@ -471,30 +471,32 @@ window.__ModuleLoader__.load({
   font-size: 11px;
   letter-spacing: 0.06em;
 }
-/* 窄屏：整表折叠成键值堆叠，单元格靠 data-label 认列 */
-.rc-table-shell[data-fold='1'] .rc-table thead { display: none; }
-.rc-table-shell[data-fold='1'] .rc-table,
-.rc-table-shell[data-fold='1'] .rc-table tbody,
-.rc-table-shell[data-fold='1'] .rc-table tr,
-.rc-table-shell[data-fold='1'] .rc-table td { display: block; width: auto; }
-.rc-table-shell[data-fold='1'] .rc-table td {
-  display: grid;
-  grid-template-columns: 92px 1fr;
-  gap: 12px;
-  border-right: 0;
-  border-bottom: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
-}
-.rc-table-shell[data-fold='1'] .rc-table td::before {
-  content: attr(data-label);
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11.5px;
-  font-weight: 400;
-}
-.rc-table-shell[data-fold='1'] .rc-table td:first-child { font-weight: 500; }
-.rc-table-shell[data-fold='1'] .rc-table td.n { text-align: left; }
-.rc-table-shell[data-fold='1'] .rc-table-group td::before { content: none; }
-.rc-table-shell[data-fold='1'] .rc-table-group td { display: block; }
+@media (max-width: 640px) {
+  /* 窄屏：整表折叠成键值堆叠，单元格靠 data-label 认列 */
+  .rc-table-shell[data-fold='1'] .rc-table thead { display: none; }
+  .rc-table-shell[data-fold='1'] .rc-table,
+  .rc-table-shell[data-fold='1'] .rc-table tbody,
+  .rc-table-shell[data-fold='1'] .rc-table tr,
+  .rc-table-shell[data-fold='1'] .rc-table td { display: block; width: auto; }
+  .rc-table-shell[data-fold='1'] .rc-table td {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 12px;
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
+  }
+  .rc-table-shell[data-fold='1'] .rc-table td::before {
+    content: attr(data-label);
+    color: var(--dsw-alias-label-secondary);
+    font-size: 11.5px;
+    font-weight: 400;
+  }
+  .rc-table-shell[data-fold='1'] .rc-table td:first-child { font-weight: 500; }
+  .rc-table-shell[data-fold='1'] .rc-table td.n { text-align: left; }
+  .rc-table-shell[data-fold='1'] .rc-table-group td::before { content: none; }
+  .rc-table-shell[data-fold='1'] .rc-table-group td { display: block; }
 
+}
 @media (prefers-reduced-motion: reduce) {
   .rc-card { animation: none; }
   .rc-skel-line { animation: none; }
