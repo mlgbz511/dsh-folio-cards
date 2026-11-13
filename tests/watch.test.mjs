@@ -38,8 +38,10 @@ assert.deepEqual(mod.patchFiles(), [patch]);
 
 // 3) 热重挂：改文件后提示词自己换档，不需要重启
 const seen = [];
+let command = null;
 const ctx = {
   effect: (fn) => { const out = fn(); return typeof out === 'function' ? out : () => {}; },
+  inject: (deps, fn) => fn({ commands: { register: (spec) => { command = spec; return () => {}; } } }),
   systemPrompt: { section: (spec) => { seen.push(spec.text); return () => {}; } },
   tools: { register: () => () => {} },
 };
@@ -58,6 +60,24 @@ const before = seen.length;
 write('sideways');
 await new Promise((resolve) => setTimeout(resolve, 500));
 assert.equal(seen.length, before, 'illegal value does not remount');
+
+// 5) setDepthInPatch 只改本插件块里的值
+assert.equal(mod.depthInPatch(mod.setDepthInPatch(fs.readFileSync(patch, 'utf8'), 'balanced')), 'balanced');
+assert.equal(mod.setDepthInPatch('nothing here', 'balanced'), 'nothing here', 'unrelated text untouched');
+assert.equal(mod.setDepthInPatch(fs.readFileSync(patch, 'utf8'), 'bogus'), fs.readFileSync(patch, 'utf8'), 'illegal depth leaves text alone');
+
+// 6) /depth 命令：注册了、改档、写回文件、立刻重挂
+assert.ok(command, '/depth command registered');
+assert.equal(command.name, 'depth');
+const reply = await command.handler({ rawInput: 'balanced' });
+assert.equal(reply.kind, 'success', 'handler reports success');
+assert.equal(mod.depthInPatch(fs.readFileSync(patch, 'utf8')), 'balanced', 'patch file rewritten');
+assert.ok(seen[seen.length - 1].includes('Depth: balanced'), 'section remounted by the command');
+const usage = await command.handler({ rawInput: '' });
+assert.equal(usage.kind, 'success');
+assert.ok(usage.text.includes('当前深度'), 'no-arg form reports current depth');
+const bad = await command.handler({ rawInput: 'detailed' });
+assert.equal(bad.kind, 'error', 'unknown depth rejected');
 
 fs.rmSync(home, { recursive: true, force: true });
 console.log('WATCH-OK');

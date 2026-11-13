@@ -17,6 +17,7 @@ const capture = (config) => {
   const seen = [];
   mod.apply({
     effect: (fn) => { const out = fn(); return typeof out === 'function' ? out : () => {}; },
+    inject: (deps, fn) => fn({ commands: { register: () => () => {} } }),
     systemPrompt: { section: (spec) => { seen.push(spec); return () => {}; } },
     tools: { register: () => () => {} },
   }, config);

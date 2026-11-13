@@ -7,7 +7,7 @@
  * (MALFORMED_RESPONSE), while a malformed fence merely stays visible as source.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, watch, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import Schema from '@deepseek-ai/schemastery';
 
@@ -148,6 +148,15 @@ export function depthInPatch(text) {
   if (!hit) return null;
   const value = hit[1].toLowerCase();
   return DEPTHS.indexOf(value) >= 0 ? value : null;
+}
+
+/** 把 patch 文本里本插件的 depth 改成给定值；没找到时原样返回。 */
+export function setDepthInPatch(text, depth) {
+  if (typeof text !== 'string' || DEPTHS.indexOf(depth) < 0) return text;
+  return text.replace(
+    /((?:- id:\s*folio-cards\b[\s\S]{0,240}?)depth:\s*)([A-Za-z]+)/,
+    (all, head) => head + depth,
+  );
 }
 
 /** 找出本机提到本插件的 patch 文件；一个都没有时返回空数组。 */
@@ -414,6 +423,45 @@ export function apply(ctx, config) {
       }
     };
   }, 'dsh-folio-cards: prompt guidance');
+
+  // 斜杠命令 /depth：改档 + 写回 patch，等价于手改配置文件但不用离开会话。
+  ctx.inject(['commands'], (cmdCtx) =>
+    cmdCtx.commands.register({
+      name: 'depth',
+      description: '切换本插件的输出深度（热生效并写回 cordis.patch.yml）。不带参数显示当前档。',
+      input: { hint: '<verbose|balanced|concise|auto>' },
+      async handler(invocation) {
+        const raw = String((invocation && invocation.rawInput) || '').trim().toLowerCase();
+        if (!raw) {
+          return { kind: 'success', text: '当前深度：' + live.depth + '（可选：' + DEPTHS.join(' | ') + '）' };
+        }
+        if (DEPTHS.indexOf(raw) < 0) {
+          return { kind: 'error', text: '未知深度：' + raw + '（可选：' + DEPTHS.join(' | ') + '）' };
+        }
+        live.depth = raw;
+        mount();
+        const written = [];
+        for (const file of patchFiles()) {
+          try {
+            const text = readFileSync(file, 'utf8');
+            const next = setDepthInPatch(text, raw);
+            if (next !== text) {
+              writeFileSync(file, next);
+              written.push(file);
+            }
+          } catch (error) {}
+        }
+        return {
+          kind: 'success',
+          text:
+            '深度已切到 ' + raw + '，' +
+            (written.length
+              ? '并写回 ' + written.length + ' 个 patch 文件，下一条回答生效。'
+              : '仅本次运行生效（未找到可写的 patch 文件）。'),
+        };
+      },
+    }),
+  );
 
   ctx.effect(() => {
     let timer = null;

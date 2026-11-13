@@ -33,6 +33,8 @@ dsh plugin --profile <你的 profile> add link:<本仓库绝对路径>
     depth: auto
 ```
 
+会话里也能直接切：`/depth verbose`（不带参数显示当前档，非法值返回错误提示）。命令同时**把值写回上面的 patch**，所以重启后仍是新档；这条不依赖设置页，也不依赖插件页。
+
 **保存文件即生效**：宿主会监听这个 patch，约半秒内重挂提示词区段，不用重启 App（这条有测试覆盖：`tests/watch.test.mjs`）。非法值一律回落 `auto`，不会让插件加载失败。
 
 没有设置页的原因：DSH 设置页只显示自己注册了设置节的插件，而把值写回宿主配置要经过 `remote.pluginManager` 的 spec 形状——这套 RPC 没有公开文档，实测的报错记录在 [探针结论](docs/plans/2026-11-14_settings-page-probe.md)。
