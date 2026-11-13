@@ -1,95 +1,100 @@
-<div align="center">
-  <img src="assets/banner.svg" alt="Rich Cards" width="100%">
-</div>
+# dsh-folio-cards
 
-<p align="center">
-  <a href="https://github.com/deepseek-ai/deepseek-harness"><img src="https://img.shields.io/badge/DSH-plugin-4f46e5?style=flat-square" alt="DSH plugin"></a>
-  <img src="https://img.shields.io/badge/blocks-12-0ea5e9?style=flat-square" alt="12 block types">
-  <img src="https://img.shields.io/badge/layout-card%20%7C%20article-8b5cf6?style=flat-square" alt="card or article">
-  <img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT">
-</p>
+让 DeepSeek Harness 的解释类回答带一张排过版的卡片：结论、要点、数据、时间线、多列对照表。
 
-<p align="center">让 DeepSeek Harness 的回答排版变得更好：标题、导语、要点、数据、时间线、配图。</p>
+基于 [ninepoin4/dsh-rich-cards](https://github.com/ninepoin4/dsh-rich-cards)（MIT）的上游源码（`fe6a86e`），在自有仓库继续演进：新增 `table` 块、把表格从「能放」变成「该放时就放」。
 
----
-
-## 它长这样
-
-<table>
-<tr>
-<td width="50%"><img src="assets/shot-ns.png" alt="NS 方程卡片"></td>
-<td width="50%"><img src="assets/shot-pepsi.png" alt="百事可乐发展史卡片"></td>
-</tr>
-<tr>
-<td align="center"><sub>card 布局：公式、定义、对比</sub></td>
-<td align="center"><sub>article 布局：长文、时间线、来源</sub></td>
-</tr>
-<tr>
-<td colspan="2" align="center"><img src="assets/shot-whale.png" alt="DeepSeek logo 卡片，配图来自 Wikimedia Commons" width="62%"></td>
-</tr>
-<tr>
-<td colspan="2" align="center"><sub>article + 真实配图：写卡前先查一张图，代码块的抬头和灰框会被隐藏</sub></td>
-</tr>
-</table>
-
-## 安装
+## 装
 
 ```sh
-dsh plugin --profile <你的 profile> add link:/path/to/dsh-rich-cards
+dsh plugin --profile <你的 profile> add link:<本仓库绝对路径>
 ```
 
-装完刷新窗口即可，卡片渲染在回答末尾，不用重启会话。
+装完**完整退出 App 再打开**（宿主提示词在启动时组装，刷新窗口不生效）。没有配置项、没有设置面板、没有工具。
 
-## 用法
+## 块类型
 
-模型会自己在合适的回答末尾写一个 `card` 围栏块：
+| 块 | 作用 |
+| --- | --- |
+| `heading` `paragraph` | 小节标题、正文 |
+| `bullets` `steps` `chips` | 要点、步骤、标签 |
+| `stats` | 2–4 个关键数字 |
+| `kv` | 左右对照的键值行（2–3 个对象 × 1–2 个字段） |
+| `callout` `quote` | 提示框（info / tip / warn）、引用 |
+| `timeline` | 带日期的事件线 |
+| `image` | 真图 URL + 说明 + 来源 |
+| `table` | 多列对照表（本项目新增） |
+| `divider` | 分隔线 |
+
+## table 块
+
+```json
+{"type": "table",
+ "headers": ["方案", "上下文", "首字延迟"],
+ "rows": [["桌面端", "1M", "0.8 s"], ["移动端", "128K", "1.4 s"]],
+ "align": ["left", "right", "right"]}
+```
+
+规则与行为：
+
+- 最多 **5 列 / 12 行**；单元格纯文本，不能含 markdown、`|` 或换行；
+- `rows` 里可插入 `{"group": "常驻节点"}` 作分组行（软胶囊，跨整列）；
+- `align` 可省。缺省时逐列探测：整列都像数字就右对齐并启用 `tabular-nums`；
+- **≥4 列**时首列 sticky，横向滚动不丢行标签；
+- **>6 行**时表格进入内部滚动（`max-height: 320px`），表头吸顶；
+- **≤640px** 整表折叠成键值堆叠，单元格靠 `data-label` 认列 —— 模型不用自己算宽度。
+
+视觉取向：低对比网格、无斑马纹、灰表头、行 hover 提亮、分组软胶囊。原型见同工作区 `prototypes/dsh-card-table-variants.html`。
+
+## 提示词约定（为什么模型会主动用表）
+
+卡片不是工具调用，而是回答末尾一个 `card` 围栏块：
 
 ````markdown
 ```card
-{
-  "title": "一句话答案",
-  "kicker": "分类 · 主题",
-  "lead": "导语",
-  "accent": "indigo",
-  "blocks": [
-    {"type": "paragraph", "text": "正文"}
-  ]
-}
+{"title": "一句话答案", "kicker": "分类 · 主题", "accent": "indigo",
+ "blocks": [{"type": "paragraph", "text": "正文"}]}
 ```
 ````
 
-也可以自己手写——渲染器只认 `card` 这个 info string，正文必须是合法 JSON。
+GUIDE（宿主注入的系统提示段）规定：
 
-配图也是这个约定的一部分：讲人物、地点、作品时先查一张真图（Windows 上用 curl 走维基图库接口），查到就配上 url + 说明 + 来源；两三次查不到就安静地不配图，不在正文里交代“接口被拦”“没找到配图”——缺图不是新闻。
-
-| 块类型                    | 作用                              |
-| ------------------------- | --------------------------------- |
-| `heading` `paragraph`     | 小节标题、正文段落                |
-| `bullets` `steps` `chips` | 要点、步骤、标签                  |
-| `stats`                   | 2–4 个关键数字                    |
-| `kv`                      | 左右对照的键值行                  |
-| `callout` `quote`         | 提示框（info / tip / warn）、引用 |
-| `timeline`                | 带年份的事件线                    |
-| `image`                   | 真实 URL + 说明 + 来源            |
-| `divider`                 | 分隔线                            |
-
-顶层还有 `layout: "card" | "article"`（article 去掉卡片外壳，按文章排版）、`sources`（底部来源标签）、`footer`。
+- 结论放在卡片里，卡后最多补两句；
+- **≥3 个对象 × ≥3 个可比字段时必须用 `table`**，禁止退回 bullets / kv；
+- `kv` 只用于 2–3 个对象 × 1–2 个字段；
+- 提示词里附一段可照抄的最小 table 示例。
 
 ## 原理
 
-- **宿主端**：往系统提示里加一段写作约定，教模型用围栏块收尾，不注册任何工具。
-- **浏览器端**：`MutationObserver` 扫描回答里的代码块，正文能解析成卡片就隐藏代码、在原位挂一张卡；解析失败就原样留着。
-
-失败即降级（fail open）：卡片写坏最多显示成一段代码，永远不会中断整轮回答——这也是它不用工具调用传参的原因。
-
-更长的版本（为什么这么设计、两条通道的取舍、拆壳的细节）在 [docs/intro.md](docs/intro.md)。
+- **宿主端**：向系统提示追加一段写作约定，不注册任何工具；
+- **客户端**：`MutationObserver` 扫回答里的 `card` 围栏，正文能解析成卡片就在原位换掉代码块；
+- **fail open**：围栏写坏只留下源码，不中断整轮回答 —— 这也是不用工具传参的原因（工具参数错会让整轮 `MALFORMED_RESPONSE`）。
 
 ## 已知边界
 
-- 一张回答只渲染一张卡（最后一张生效）；
-- 卡片位置固定在回答末尾，不能插到段落中间；
-- 解析靠 DOM 匹配，主题改动代码块结构时可能失效。
+- 一张回答只渲染一张卡（最后一张生效），卡片固定在回答末尾；
+- 认壳依赖代码块 DOM 结构（`data-code-block-*` 属性），渲染器大改结构时需重新适配；
+- table 的吸顶／sticky 只在内部滚动容器里生效，行数不足时不会触发；
+- 模型服从度是概率问题：提示词能让它大概率用表，不能保证 100%。
+
+## 与上游的差异
+
+| | 上游 `dsh-rich-cards` | 本仓库 |
+| --- | --- | --- |
+| 版本 | 1.2.4 | 1.4.0 |
+| 块类型 | 12 | 13（+`table`）|
+| 表格 | 无，只能 `kv` 两列 | V5 网格 + sticky 首列 + 数值对齐 + 吸顶 + 窄屏折叠 |
+| 提示词 | 无表格判据 | 3×3 强制用表 + 最小示例 |
+| 测试 | 无 | `tests/table.test.mjs`（6 组断言，`node tests/table.test.mjs`）|
+| 素材 | 自带截图/logo | 不含上游图片素材 |
+
+## 开发
+
+```sh
+node --check index.js && node --check client.js
+node tests/table.test.mjs     # 期望输出 TABLE-OK
+```
 
 ## License
 
-MIT
+MIT，见 [LICENSE](LICENSE)。上游版权归 ninepoin4。
