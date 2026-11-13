@@ -403,6 +403,98 @@ window.__ModuleLoader__.load({
   .rc-stats { grid-template-columns: 1fr 1fr; }
   .rc-kv-row { grid-template-columns: 78px 1fr; }
 }
+/* 表格块：低对比网格 + 灰表头，无斑马；窄屏折叠为键值堆叠。 */
+.rc-table-shell {
+  margin: 14px 0 6px;
+  border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.rc-table-scroll { max-height: 320px; overflow: auto; scrollbar-width: thin; }
+.rc-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.rc-table th,
+.rc-table td {
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: baseline;
+  border-right: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
+}
+.rc-table th:last-child,
+.rc-table td:last-child { border-right: 0; }
+.rc-table tbody tr:last-child td { border-bottom: 0; }
+.rc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 4%, var(--dsw-alias-bg-layer-1));
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.rc-table tbody tr:hover td {
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 4%, transparent);
+}
+.rc-table td:first-child { font-weight: 500; }
+.rc-table .n { text-align: right; font-variant-numeric: tabular-nums; }
+.rc-table thead th.n { text-align: right; }
+.rc-table-sticky thead th:first-child,
+.rc-table-sticky tbody td:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--dsw-alias-bg-layer-1);
+}
+.rc-table-sticky thead th:first-child {
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 4%, var(--dsw-alias-bg-layer-1));
+  z-index: 2;
+}
+.rc-table-group td {
+  background: color-mix(in oklab, var(--rc-accent) 7%, transparent);
+  border-bottom-color: transparent;
+  padding: 7px 12px;
+}
+.rc-table-group span {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--rc-accent) 18%, transparent);
+  color: color-mix(in oklab, var(--rc-accent) 62%, var(--dsw-alias-label-primary));
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+/* 窄屏：整表折叠成键值堆叠，单元格靠 data-label 认列 */
+.rc-table-shell[data-fold='1'] .rc-table thead { display: none; }
+.rc-table-shell[data-fold='1'] .rc-table,
+.rc-table-shell[data-fold='1'] .rc-table tbody,
+.rc-table-shell[data-fold='1'] .rc-table tr,
+.rc-table-shell[data-fold='1'] .rc-table td { display: block; width: auto; }
+.rc-table-shell[data-fold='1'] .rc-table td {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 12px;
+  border-right: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
+}
+.rc-table-shell[data-fold='1'] .rc-table td::before {
+  content: attr(data-label);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+.rc-table-shell[data-fold='1'] .rc-table td:first-child { font-weight: 500; }
+.rc-table-shell[data-fold='1'] .rc-table td.n { text-align: left; }
+.rc-table-shell[data-fold='1'] .rc-table-group td::before { content: none; }
+.rc-table-shell[data-fold='1'] .rc-table-group td { display: block; }
+
 @media (prefers-reduced-motion: reduce) {
   .rc-card { animation: none; }
   .rc-skel-line { animation: none; }
@@ -493,6 +585,112 @@ window.__ModuleLoader__.load({
         h('dt', { className: 'rc-kv-k' }, label),
         h('dd', { className: 'rc-kv-v' }, value),
       );
+    }
+
+    // ponytail: 表格只吃纯文本单元格，不做富文本/合并单元格。升级路径 = 单元格对象 {text, href}。
+    const TABLE_NUMERIC = /^[+\-—–]?\s*[¥$€£]?\s*\d+(?:[.,]\d+)*\s*(?:%|K|M|B|s|ms|h|天|行|倍|GB|MB|KB)?$/i;
+
+    function tableAlignOf(cells) {
+      const filled = cells.filter((value) => value !== '');
+      return filled.length > 0 && filled.every((value) => TABLE_NUMERIC.test(value)) ? 'right' : 'left';
+    }
+
+    function tableSpec(block) {
+      const headers = list(block.headers).map((cell) => text(cell));
+      const raw = list(block.rows);
+      const width = raw.reduce(
+        (max, row) => (Array.isArray(row) ? Math.max(max, row.length) : max),
+        headers.length,
+      );
+      if (width === 0) return null;
+      const entries = [];
+      for (let index = 0; index < raw.length; index += 1) {
+        const row = raw[index];
+        if (row && typeof row === 'object' && !Array.isArray(row)) {
+          const title = text(row.group);
+          if (title) entries.push({ group: title });
+          continue;
+        }
+        if (!Array.isArray(row)) continue;
+        entries.push({
+          cells: Array.from({ length: width }, (_, col) => text(row[col])),
+        });
+      }
+      const declared = Array.isArray(block.align) ? block.align.map((value) => text(value)) : [];
+      const align = Array.from({ length: width }, (_, col) => {
+        if (declared[col] === 'right' || declared[col] === 'left') return declared[col];
+        const column = entries.filter((entry) => entry.cells).map((entry) => entry.cells[col]);
+        return tableAlignOf(column);
+      });
+      return { headers, entries, align, width };
+    }
+
+    function Table(props) {
+      const spec = tableSpec(props.block);
+      if (!spec || spec.entries.length === 0) return null;
+      const rowCount = spec.entries.filter((entry) => entry.cells).length;
+      const scroll = rowCount > 6;
+      const sticky = spec.width >= 4;
+      const head = spec.headers.length
+        ? h(
+            'thead',
+            null,
+            h(
+              'tr',
+              null,
+              Array.from({ length: spec.width }, (_, col) =>
+                h(
+                  'th',
+                  { key: col, className: spec.align[col] === 'right' ? 'n' : null },
+                  spec.headers[col] || '',
+                ),
+              ),
+            ),
+          )
+        : null;
+      const body = h(
+        'tbody',
+        null,
+        spec.entries.map((entry, index) => {
+          if (entry.group) {
+            return h(
+              'tr',
+              { key: index, className: 'rc-table-group' },
+              h('td', { colSpan: spec.width }, h('span', null, entry.group)),
+            );
+          }
+          return h(
+            'tr',
+            { key: index },
+            entry.cells.map((cell, col) =>
+              h(
+                'td',
+                {
+                  key: col,
+                  className: spec.align[col] === 'right' ? 'n' : null,
+                  'data-label': spec.headers[col] || '',
+                },
+                cell,
+              ),
+            ),
+          );
+        }),
+      );
+      const table = h(
+        'table',
+        { className: 'rc-table' + (sticky ? ' rc-table-sticky' : '') },
+        head,
+        body,
+      );
+      return h(
+        'div',
+        { className: 'rc-table-shell', 'data-fold': '1', 'data-cols': spec.width },
+        scroll ? h('div', { className: 'rc-table-scroll' }, table) : table,
+      );
+    }
+
+    function renderTable(block, key) {
+      return h(Table, { key: key, block: block });
     }
 
     function Figure(props) {
@@ -596,6 +794,8 @@ window.__ModuleLoader__.load({
         const nodes = entries.map((entry, i) => renderRow(entry, i)).filter(Boolean);
         return nodes.length ? h('dl', { className: 'rc-kv', key }, nodes) : null;
       }
+
+      if (type === 'table') return renderTable(block, key);
 
       if (type === 'callout') {
         const title = text(block.title);
@@ -916,6 +1116,8 @@ window.__ModuleLoader__.load({
 
     return {
       inject: ['slots'],
+      // 供 tests/table.test.mjs 断言的纯函数出口；浏览器里没人读它。
+      __test: { tableSpec: tableSpec, Table: Table, Card: Card },
       apply(ctx) {
         const style = document.createElement('style');
         style.setAttribute('data-dsh-rich-cards', '');
