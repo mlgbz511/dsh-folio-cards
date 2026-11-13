@@ -1497,32 +1497,6 @@ window.__ModuleLoader__.load({
       }
       return Panel;
     }
-    return { patchId: found.patchId || 'folio-cards' };
-        };
-        const report = () => [
-          'PROBE ALIVE v8',
-          safe('pm keys', () => (pm ? Object.keys(pm).join(',') : 'unavailable')),
-          'found: ' + (found ? String(found.entryId) + ' / ' + String(found.moduleName) + ' / ' + String(found.patchId) : 'none'),
-        ].join(String.fromCharCode(10));
-        const btn = (text, onClick) =>
-          h('button', { type: 'button', onClick, style: { marginRight: '6px', marginBottom: '6px' } }, text);
-        return h(
-          'div',
-          null,
-          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针 v8'),
-          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '11px' } }, report()),
-          h('div', { style: { margin: '8px 0' } },
-            btn('scan listPlugins', scan),
-            btn('inspect({entryId},{})', () => run('I-entry', () => m('inspect')(specId('entryId'), {}))),
-            btn('inspect({patchId},{})', () => run('I-patch', () => m('inspect')(specId('patchId'), {}))),
-            btn('update(entrySpec,cfg,{})', () => run('U-entry', () => m('updateBundle')(specId('entryId'), { config: { depth: 'verbose' } }, {}))),
-            btn('update({patchId,config},{},{})', () => run('U-patch', () => m('updateBundle')({ patchId: found ? found.patchId : 'folio-cards', config: { depth: 'verbose' } }, {}, {}))),
-          ),
-          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '11px' } }, out),
-        );
-      }
-      return Panel;
-    }
     return {
       inject: ['slots', 'connection', 'remote', 'remote.pluginManager'],
       // 供 tests/table.test.mjs 断言的纯函数出口；浏览器里没人读它。
