@@ -1448,7 +1448,6 @@ window.__ModuleLoader__.load({
     function probeSection(ctx) {
       function Panel() {
         const [out, setOut] = React.useState('idle');
-        const [found, setFound] = React.useState(null);
         const safe = (label, fn) => {
           try { return label + ': ' + fn(); } catch (error) { return label + ' ERR ' + String((error && error.message) || error); }
         };
@@ -1472,22 +1471,33 @@ window.__ModuleLoader__.load({
             setOut(label + ' -> THROW ' + String((error && error.message) || error).slice(0, 400));
           }
         };
-        const scan = () => {
-          setOut('scan -> 请求中…');
-          Promise.resolve(m('listPlugins')()).then(
-            (res) => {
-              const list = (res && (res.value || res)) || [];
-              const hit = list.find((entry) => JSON.stringify(entry).indexOf('folio') >= 0) || null;
-              setFound(hit);
-              setOut('scan -> ' + (hit ? JSON.stringify(hit) : 'no folio entry'));
-            },
-            (error) => setOut('scan -> ERR ' + String((error && error.message) || error).slice(0, 400)),
-          );
-        };
-        const specId = (kind) => {
-          if (!found) throw new Error('先点 scan');
-          if (kind === 'entryId') return { entryId: found.entryId };
-          return { patchId: found.patchId || 'folio-cards' };
+        const NAME = 'dsh-folio-cards';
+        const cfg = { config: { depth: 'verbose' } };
+        const report = () => [
+          'PROBE ALIVE v9',
+          safe('pm keys', () => (pm ? Object.keys(pm).join(',') : 'unavailable')),
+          'entry: include:folio-cards / dsh-folio-cards / folio-cards',
+        ].join(String.fromCharCode(10));
+        const btn = (text, onClick) =>
+          h('button', { type: 'button', onClick, style: { marginRight: '6px', marginBottom: '6px' } }, text);
+        return h(
+          'div',
+          null,
+          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针 v9'),
+          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '11px' } }, report()),
+          h('div', { style: { margin: '8px 0' } },
+            btn('A inspect({name})', () => run('A', () => m('inspect')({ name: NAME }, {}))),
+            btn('B inspect({patchId,name})', () => run('B', () => m('inspect')({ patchId: 'folio-cards', name: NAME }, {}))),
+            btn('C update({name,config},{},{})', () => run('C', () => m('updateBundle')({ name: NAME, config: cfg.config }, {}, {}))),
+            btn('D update(name,{config},{})', () => run('D', () => m('updateBundle')(NAME, cfg, {}))),
+            btn('E update({name,config},{})', () => run('E', () => m('updateBundle')({ name: NAME, config: cfg.config }, {}))),
+          ),
+          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '11px' } }, out),
+        );
+      }
+      return Panel;
+    }
+    return { patchId: found.patchId || 'folio-cards' };
         };
         const report = () => [
           'PROBE ALIVE v8',
