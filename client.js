@@ -1448,65 +1448,63 @@ window.__ModuleLoader__.load({
     function probeSection(ctx) {
       function Panel() {
         const [out, setOut] = React.useState('idle');
-        // 访问未 inject 的服务会抛异常，探针自己必须兜住
-        const remoteOf = () => {
-          try {
-            return ctx.remote || (ctx.api && ctx.api.remote) || null;
-          } catch (error) {
-            return null;
-          }
-        };
         const safe = (label, fn) => {
-          try {
-            return label + ': ' + fn();
-          } catch (error) {
-            return label + ' ERR ' + String((error && error.message) || error);
-          }
+          try { return label + ': ' + fn(); } catch (error) { return label + ' ERR ' + String((error && error.message) || error); }
         };
+        const bind = (name) => {
+          try { return ctx[name] || null; } catch (error) { return null; }
+        };
+        const conn = bind('connection');
+        const remote = bind('remote');
         const report = () => {
           const lines = ['PROBE ALIVE'];
-          const remote = remoteOf();
           lines.push(safe('ctx keys', () => Object.keys(ctx).join(',')));
+          lines.push(safe('connection', () => (conn ? Object.keys(conn).join(',') : 'unavailable')));
+          lines.push(safe('connection.rpc', () => (conn && conn.rpc ? Object.keys(conn.rpc).join(',') : 'unavailable')));
           lines.push(safe('remote', () => (remote ? Object.keys(remote).join(',') : 'unavailable')));
           lines.push(
-            safe('pluginManager', () => {
+            safe('remote.pluginManager', () => {
               const pm = remote && remote.pluginManager;
               return pm ? Object.keys(pm).join(',') : 'unavailable';
             }),
           );
           return lines.join('\n');
         };
-        const run = (label, args) => {
+        const run = (label, invoke) => {
           setOut(label + ' -> 请求中…');
           try {
-            const remote = remoteOf();
-            const pm = remote && remote.pluginManager;
-            const fn = pm && pm.updateBundle;
-            if (typeof fn !== 'function') {
-              setOut(label + ' -> updateBundle 不可用');
-              return;
-            }
-            Promise.resolve(fn.call(pm, args)).then(
-              (res) => setOut(label + ' -> OK ' + JSON.stringify(res).slice(0, 400)),
-              (error) => setOut(label + ' -> ERR ' + String((error && error.message) || error).slice(0, 300)),
+            Promise.resolve(invoke()).then(
+              (res) => setOut(label + ' -> OK ' + JSON.stringify(res).slice(0, 500)),
+              (error) => setOut(label + ' -> ERR ' + String((error && error.message) || error).slice(0, 400)),
             );
           } catch (error) {
-            setOut(label + ' -> THROW ' + String((error && error.message) || error).slice(0, 300));
+            setOut(label + ' -> THROW ' + String((error && error.message) || error).slice(0, 400));
           }
+        };
+        const rpc = (endpoint, method, payload) => () => {
+          if (!conn || !conn.rpc || typeof conn.rpc.call !== 'function') throw new Error('connection.rpc.call 不可用');
+          return conn.rpc.call('/api', endpoint, { method, payload });
+        };
+        const remoteCall = (method, payload) => () => {
+          const pm = remote && remote.pluginManager;
+          const fn = pm && pm[method];
+          if (typeof fn !== 'function') throw new Error('remote.pluginManager.' + method + ' 不可用');
+          return fn.call(pm, payload);
         };
         const btn = (text, onClick) =>
           h('button', { type: 'button', onClick, style: { marginRight: '8px' } }, text);
         return h(
           'div',
           null,
-          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针'),
+          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针 v3'),
           h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '12px' } }, report()),
           h(
             'div',
             { style: { margin: '10px 0' } },
-            btn('A: {id, config}', () => run('A', { id: 'folio-cards', config: { depth: 'verbose' } })),
-            btn('B: {id, depth}', () => run('B', { id: 'folio-cards', depth: 'verbose' })),
-            btn('C: {name, config}', () => run('C', { name: 'dsh-folio-cards', config: { depth: 'verbose' } })),
+            btn('A: rpc {id,config}', () => run('A', rpc('pluginManager', 'updateBundle', { id: 'folio-cards', config: { depth: 'verbose' } }))),
+            btn('B: rpc {id,depth}', () => run('B', rpc('pluginManager', 'updateBundle', { id: 'folio-cards', depth: 'verbose' }))),
+            btn('C: remote call', () => run('C', remoteCall('updateBundle', { id: 'folio-cards', config: { depth: 'verbose' } }))),
+            btn('D: rpc inspect', () => run('D', rpc('pluginManager', 'inspect', { id: 'folio-cards' }))),
           ),
           h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '12px' } }, out),
         );
@@ -1515,7 +1513,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ['slots'],
+      inject: ['slots', 'connection', 'remote'],
       // 供 tests/table.test.mjs 断言的纯函数出口；浏览器里没人读它。
       __test: {
         tableSpec: tableSpec,
