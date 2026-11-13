@@ -1448,6 +1448,7 @@ window.__ModuleLoader__.load({
     function probeSection(ctx) {
       function Panel() {
         const [out, setOut] = React.useState('idle');
+        const [found, setFound] = React.useState(null);
         const safe = (label, fn) => {
           try { return label + ': ' + fn(); } catch (error) { return label + ' ERR ' + String((error && error.message) || error); }
         };
@@ -1455,40 +1456,57 @@ window.__ModuleLoader__.load({
           try { return ctx.remote || null; } catch (error) { return null; }
         })();
         const pm = remote && remote.pluginManager;
+        const m = (name) => {
+          const f = pm && pm[name];
+          if (typeof f !== 'function') throw new Error(name + ' 不可用');
+          return f.bind(pm);
+        };
         const run = (label, invoke) => {
           setOut(label + ' -> 请求中…');
           try {
             Promise.resolve(invoke()).then(
-              (res) => setOut(label + ' -> OK ' + JSON.stringify(res).slice(0, 600)),
+              (res) => setOut(label + ' -> ' + JSON.stringify(res).slice(0, 700)),
               (error) => setOut(label + ' -> ERR ' + String((error && error.message) || error).slice(0, 400)),
             );
           } catch (error) {
             setOut(label + ' -> THROW ' + String((error && error.message) || error).slice(0, 400));
           }
         };
-        const m = (name) => {
-          const f = pm && pm[name];
-          if (typeof f !== 'function') throw new Error(name + ' 不可用');
-          return f.bind(pm);
+        const scan = () => {
+          setOut('scan -> 请求中…');
+          Promise.resolve(m('listPlugins')()).then(
+            (res) => {
+              const list = (res && (res.value || res)) || [];
+              const hit = list.find((entry) => JSON.stringify(entry).indexOf('folio') >= 0) || null;
+              setFound(hit);
+              setOut('scan -> ' + (hit ? JSON.stringify(hit) : 'no folio entry'));
+            },
+            (error) => setOut('scan -> ERR ' + String((error && error.message) || error).slice(0, 400)),
+          );
+        };
+        const specId = (kind) => {
+          if (!found) throw new Error('先点 scan');
+          if (kind === 'entryId') return { entryId: found.entryId };
+          return { patchId: found.patchId || 'folio-cards' };
         };
         const report = () => [
-          'PROBE ALIVE v7',
+          'PROBE ALIVE v8',
           safe('pm keys', () => (pm ? Object.keys(pm).join(',') : 'unavailable')),
-          safe('methods', () => (pm && pm.methods ? JSON.stringify(pm.methods).slice(0, 900) : 'none')),
+          'found: ' + (found ? String(found.entryId) + ' / ' + String(found.moduleName) + ' / ' + String(found.patchId) : 'none'),
         ].join(String.fromCharCode(10));
         const btn = (text, onClick) =>
           h('button', { type: 'button', onClick, style: { marginRight: '6px', marginBottom: '6px' } }, text);
         return h(
           'div',
           null,
-          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针 v7'),
+          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针 v8'),
           h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '11px' } }, report()),
           h('div', { style: { margin: '8px 0' } },
-            btn('A listPlugins()', () => run('A', () => m('listPlugins')())),
-            btn('B inspect({id},{})', () => run('B', () => m('inspect')({ id: 'folio-cards' }, {}))),
-            btn('C inspect(id,{})', () => run('C', () => m('inspect')('folio-cards', {}))),
-            btn('D update(id,cfg,{})', () => run('D', () => m('updateBundle')('folio-cards', { depth: 'verbose' }, {}))),
-            btn('E update({id,cfg},{},{})', () => run('E', () => m('updateBundle')({ id: 'folio-cards', config: { depth: 'verbose' } }, {}, {}))),
+            btn('scan listPlugins', scan),
+            btn('inspect({entryId},{})', () => run('I-entry', () => m('inspect')(specId('entryId'), {}))),
+            btn('inspect({patchId},{})', () => run('I-patch', () => m('inspect')(specId('patchId'), {}))),
+            btn('update(entrySpec,cfg,{})', () => run('U-entry', () => m('updateBundle')(specId('entryId'), { config: { depth: 'verbose' } }, {}))),
+            btn('update({patchId,config},{},{})', () => run('U-patch', () => m('updateBundle')({ patchId: found ? found.patchId : 'folio-cards', config: { depth: 'verbose' } }, {}, {}))),
           ),
           h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '11px' } }, out),
         );
