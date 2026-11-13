@@ -455,7 +455,6 @@ window.__ModuleLoader__.load({
 .rc-table th,
 .rc-table td {
   min-width: 5.5em;
-  word-break: keep-all;
   overflow-wrap: break-word;
 }
 .rc-table thead th.n { text-align: right; }
