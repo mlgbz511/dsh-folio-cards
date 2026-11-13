@@ -1451,28 +1451,10 @@ window.__ModuleLoader__.load({
         const safe = (label, fn) => {
           try { return label + ': ' + fn(); } catch (error) { return label + ' ERR ' + String((error && error.message) || error); }
         };
-        const bind = (name) => {
-          try { return ctx[name] || null; } catch (error) { return null; }
-        };
-        const remote = bind('remote');
-        const report = () => {
-          const lines = ['PROBE ALIVE v4'];
-          lines.push(safe('ctx keys', () => Object.keys(ctx).join(',')));
-          lines.push(safe('remote', () => (remote ? Object.keys(remote).join(',') : 'unavailable')));
-          lines.push(safe('methods', () => {
-            const ns = remote && remote.pluginManager;
-            const meta = ns && ns.methods;
-            if (!meta) return 'no methods map';
-            return Object.keys(meta).slice(0, 24).join(',');
-          }));
-          lines.push(
-            safe('remote.pluginManager', () => {
-              const ns = remote && remote.pluginManager;
-              return ns ? Object.keys(ns).join(',') : 'unavailable';
-            }),
-          );
-          return lines.join('\n');
-        };
+        const remote = (() => {
+          try { return ctx.remote || null; } catch (error) { return null; }
+        })();
+        const pm = remote && remote.pluginManager;
         const run = (label, invoke) => {
           setOut(label + ' -> 请求中…');
           try {
@@ -1484,29 +1466,31 @@ window.__ModuleLoader__.load({
             setOut(label + ' -> THROW ' + String((error && error.message) || error).slice(0, 400));
           }
         };
-        const call = (method, payload) => () => {
-          const ns = remote && remote.pluginManager;
-          const fn = ns && ns[method];
-          if (typeof fn !== 'function') throw new Error('remote.pluginManager.' + method + ' 不可用');
-          // RPC façade counts business arguments; pad to three so the arity check passes
-          return fn.call(ns, payload, undefined, undefined);
+        const m = (name) => {
+          const f = pm && pm[name];
+          if (typeof f !== 'function') throw new Error(name + ' 不可用');
+          return f.bind(pm);
         };
+        const report = () => [
+          'PROBE ALIVE v7',
+          safe('pm keys', () => (pm ? Object.keys(pm).join(',') : 'unavailable')),
+          safe('methods', () => (pm && pm.methods ? JSON.stringify(pm.methods).slice(0, 900) : 'none')),
+        ].join(String.fromCharCode(10));
         const btn = (text, onClick) =>
-          h('button', { type: 'button', onClick, style: { marginRight: '8px' } }, text);
+          h('button', { type: 'button', onClick, style: { marginRight: '6px', marginBottom: '6px' } }, text);
         return h(
           'div',
           null,
-          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针 v4'),
-          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '12px' } }, report()),
-          h(
-            'div',
-            { style: { margin: '10px 0' } },
-            btn('A: listPlugins', () => run('A', call('listPlugins', {}))),
-            btn('B: inspect', () => run('B', call('inspect', { id: 'folio-cards' }))),
-            btn('C: update {id,config}', () => run('C', call('updateBundle', { id: 'folio-cards', config: { depth: 'verbose' } }))),
-            btn('D: update {name,config}', () => run('D', call('updateBundle', { name: 'dsh-folio-cards', config: { depth: 'verbose' } }))),
+          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针 v7'),
+          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '11px' } }, report()),
+          h('div', { style: { margin: '8px 0' } },
+            btn('A listPlugins()', () => run('A', () => m('listPlugins')())),
+            btn('B inspect({id},{})', () => run('B', () => m('inspect')({ id: 'folio-cards' }, {}))),
+            btn('C inspect(id,{})', () => run('C', () => m('inspect')('folio-cards', {}))),
+            btn('D update(id,cfg,{})', () => run('D', () => m('updateBundle')('folio-cards', { depth: 'verbose' }, {}))),
+            btn('E update({id,cfg},{},{})', () => run('E', () => m('updateBundle')({ id: 'folio-cards', config: { depth: 'verbose' } }, {}, {}))),
           ),
-          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '12px' } }, out),
+          h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '11px' } }, out),
         );
       }
       return Panel;
