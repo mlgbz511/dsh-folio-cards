@@ -7,6 +7,8 @@
  * (MALFORMED_RESPONSE), while a malformed fence merely stays visible as source.
  */
 
+import Schema from '@deepseek-ai/schemastery';
+
 const REGISTER_TOOL = false;
 
 const ACCENTS = ['indigo', 'teal', 'amber', 'rose', 'violet', 'slate'];
@@ -40,7 +42,7 @@ const DESCRIPTION = [
   'One card per answer; write in the user\'s language.',
 ].join(' ');
 
-const GUIDE = [
+const BASE_GUIDE = [
   '## Rich answer cards',
   'A reply that explains rather than acts can end with one card: a fenced code block whose info',
   'string is `card` and whose body is a JSON object. The host renders that block as a typographic',
@@ -52,8 +54,9 @@ const GUIDE = [
   '```',
   '',
   'Rules:',
-  '- Exactly one card fence per reply, at the very end, after at most two short sentences of prose.',
-  '- The card IS the answer: put the whole explanation inside the blocks and never repeat it in prose.',
+  '- At most one card per reply, placed at the end. A short factual answer may be the card alone.',
+  '- The card carries the verdict, the comparison or the code. It must not restate the prose; the',
+  '  reasoning belongs in the prose and is never compressed to fit the card.',
   '- The body must parse as JSON: no line breaks or ASCII double quotes inside a string (use 「」), no',
   '  trailing commas. A body that fails to parse stays visible as source, so keep strings short.',
   '- Top-level fields: title, kicker, lead, accent (indigo | teal | amber | rose | violet | slate),',
@@ -91,7 +94,50 @@ const GUIDE = [
   '- Every string is plain text: no markdown, no bullet characters. Write in the user language.',
   '- Skip the card for short factual replies, code or file work, status reports and questions back to',
   '  the user.',
-].join('\n');
+];
+
+const DEPTHS = ['verbose', 'balanced', 'concise', 'auto'];
+
+const DEPTH_GUIDE = {
+  concise: [
+    '## Depth: concise',
+    'Prose stays at two short sentences or fewer. The card is the answer: everything the reader needs',
+    'sits inside its blocks. No preamble, no afterword.',
+  ],
+  balanced: [
+    '## Depth: balanced',
+    'Write three or four short paragraphs of reasoning first (the cause, the alternative you rejected,',
+    'the limit of the advice), then one card holding the verdict, the comparison table or the code.',
+    'The card repeats nothing from the prose.',
+  ],
+  verbose: [
+    '## Depth: verbose',
+    'Write the reasoning in full prose first, with no length cap: the causal chain, the alternatives you',
+    'rejected and why, the boundary where the advice stops. Then at most one card carrying only the',
+    'verdict, the comparison and the code. Never compress the analysis to fit the card.',
+  ],
+  auto: [
+    '## Depth: auto, chosen at runtime',
+    'Pick the depth before writing, from the shape of the question:',
+    '- one fact, one comparison, one snippet: concise — two sentences of prose, the card carries the answer;',
+    '- a why or a which-is-better: balanced — three or four paragraphs of reasoning, then one card;',
+    '- a diagnosis, a plan or a design decision: verbose — full reasoning, rejected options, boundaries, then one card.',
+    'Never pad a simple answer to look thorough, and never squeeze a complex one to fit the card.',
+  ],
+};
+
+export const Config = Schema.object({
+  depth: Schema.string().default('auto'),
+});
+
+function depthOf(config) {
+  const value = config && typeof config.depth === 'string' ? config.depth.trim().toLowerCase() : '';
+  return DEPTHS.indexOf(value) >= 0 ? value : 'auto';
+}
+
+function guideFor(depth) {
+  return BASE_GUIDE.concat(DEPTH_GUIDE[depth] || DEPTH_GUIDE.auto).join('\n');
+}
 
 const PARAMETERS = {
   type: 'object',
@@ -301,7 +347,8 @@ function presentCall(args) {
 
 export const inject = ['tools', 'systemPrompt'];
 
-export function apply(ctx) {
+export function apply(ctx, config) {
+  const depth = depthOf(config);
   if (REGISTER_TOOL) ctx.effect(
     () =>
       ctx.tools.register({
@@ -324,7 +371,7 @@ export function apply(ctx) {
       ctx.systemPrompt.section({
         name: 'folio-cards',
         order: 34,
-        text: GUIDE,
+        text: guideFor(depth),
       }),
     'dsh-folio-cards: prompt guidance',
   );
