@@ -8,7 +8,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync, watch } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import Schema from '@deepseek-ai/schemastery';
 
 const REGISTER_TOOL = false;
@@ -417,8 +417,10 @@ export function apply(ctx, config) {
 
   ctx.effect(() => {
     let timer = null;
+    // 监听目录而不是文件：编辑器常常先写临时文件再 rename，直接 watch 文件会跟丢。
     const watchers = patchFiles().map((file) =>
-      watch(file, { persistent: false }, () => {
+      watch(dirname(file), { persistent: false }, (event, name) => {
+        if (name && String(name) !== 'cordis.patch.yml') return;
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => {
           let text = '';
