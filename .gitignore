@@ -1,4 +1,10 @@
 node_modules/
+*.log
+_patch*.py
+.DS_Store
+.dsh-ops-*.lock
+dsh-ops-*.lock
+node_modules/
 .DS_Store
 *.log
 .tmp/

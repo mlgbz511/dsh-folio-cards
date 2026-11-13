@@ -1,13 +1,13 @@
 /**
- * Client half of `dsh-folio-cards`.
+ * Client half of `dsh-rich-cards`.
  *
- * Turns a `card` fence in the conversation into a typographic card in place. Nothing here owns
- * state: the card is a pure function of the fence body, so replay, fork and resume reproduce it
- * exactly. A body that fails to parse stays visible as source.
+ * Registers a Tool call view for the `rich_card` tool and draws the persisted
+ * arguments as a typographic card. Nothing here owns state: the card is a pure
+ * function of the Tool call, so replay, fork and resume reproduce it exactly.
  */
 
 window.__ModuleLoader__.load({
-  id: 'dsh-folio-cards',
+  id: 'dsh-rich-cards',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -415,25 +415,46 @@ window.__ModuleLoader__.load({
       return '';
     }
 
-    // ponytail: 只挡字面内网/本机地址与非 http(s) 协议，不解析 DNS，也不管重定向后的落点；
-    // 升级路径 = 宿主端预取校验并存本地副本。
-    const PRIVATE_HOST = /^(?:localhost|127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|169\.254\.|0\.0\.0\.0|\[?::1\]?)/i;
-    function safeUrl(raw) {
-      if (!raw) return '';
-      let parsed;
-      try {
-        parsed = new URL(raw);
-      } catch (error) {
-        return '';
-      }
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '';
-      if (PRIVATE_HOST.test(parsed.hostname)) return '';
-      if (/\.(?:local|internal|localhost)$/i.test(parsed.hostname)) return '';
-      return parsed.href;
-    }
-
     function list(value) {
       return Array.isArray(value) ? value : [];
+    }
+
+    /** Unknown = arguments still streaming; null = no usable arguments. */
+    function parseArguments(raw) {
+      if (typeof raw !== 'string') return null;
+      const source = raw.trim();
+      if (!source) return null;
+      try {
+        const value = JSON.parse(source);
+        return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+      } catch (error) {
+        return undefined;
+      }
+    }
+
+    function specOf(block) {
+      if (!block || typeof block !== 'object') return null;
+      const call = block.call && typeof block.call === 'object' ? block.call : null;
+
+      // 1) Raw JSON strings: the Tool call keeps the exact arguments the model sent.
+      const raws = [block.argsRaw, call && call.argsRaw, block.args, call && call.args];
+      for (let index = 0; index < raws.length; index += 1) {
+        const value = raws[index];
+        if (typeof value !== 'string') continue;
+        const parsed = parseArguments(value);
+        if (parsed) return parsed;
+      }
+
+      // 2) Plain objects that actually look like a card. A lazy `args` accessor has
+      // neither `blocks` nor `title`, so it is ignored instead of rendering a blank card.
+      const objects = [block.args, call && call.args, block];
+      for (let index = 0; index < objects.length; index += 1) {
+        const value = objects[index];
+        if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+        if (Array.isArray(value.blocks) || typeof value.title === 'string') return value;
+      }
+
+      return null;
     }
 
     function paragraphs(value, key) {
@@ -475,7 +496,7 @@ window.__ModuleLoader__.load({
     }
 
     function Figure(props) {
-      const url = safeUrl(text(props.url));
+      const url = text(props.url);
       const alt = text(props.alt);
       const caption = text(props.caption);
       const credit = text(props.credit);
@@ -492,7 +513,6 @@ window.__ModuleLoader__.load({
               src: url,
               alt: alt,
               loading: 'lazy',
-              referrerPolicy: 'no-referrer',
               onError: function () { setFailed(true); },
             }),
         caption || credit
@@ -619,6 +639,17 @@ window.__ModuleLoader__.load({
       return null;
     }
 
+    function Skeleton() {
+      return h(
+        'div',
+        { className: 'rc-card rc-skeleton', 'data-accent': 'indigo', 'aria-hidden': 'true' },
+        h('div', { className: 'rc-skel-line', style: { width: '38%' } }),
+        h('div', { className: 'rc-skel-line', style: { width: '74%', height: '14px' } }),
+        h('div', { className: 'rc-skel-line', style: { width: '88%' } }),
+        h('div', { className: 'rc-skel-line', style: { width: '62%', marginBottom: 0 } }),
+      );
+    }
+
     function Card(props) {
       const spec = props.spec;
       const accent = ACCENTS.indexOf(text(spec.accent)) >= 0 ? text(spec.accent) : 'indigo';
@@ -663,6 +694,78 @@ window.__ModuleLoader__.load({
       );
     }
 
+    function nodeAt(pool, id) {
+      if (!pool) return null;
+      if (typeof pool.get === 'function') return pool.get(id) || null;
+      return pool[id] || null;
+    }
+
+    /** Last rich_card call that belongs to `turn`, read straight from the Chat nodes. */
+    function cardOf(chat, turn) {
+      if (!chat || !turn || !Array.isArray(chat.order)) return null;
+      const startSeq =
+        turn.start && typeof turn.start.seq === 'number' ? turn.start.seq : -Infinity;
+      const endSeq = turn.end && typeof turn.end.seq === 'number' ? turn.end.seq : Infinity;
+      const ids = chat.order;
+      for (let index = ids.length - 1; index >= 0; index -= 1) {
+        const node = nodeAt(chat.nodes, ids[index]);
+        if (!node || node.kind !== 'tool-call') continue;
+        const anchor = node.anchorSeq;
+        if (typeof anchor === 'number' && anchor < startSeq) break;
+        if (typeof anchor === 'number' && anchor > endSeq) continue;
+        const root = node.data && node.data.root;
+        if (!root || root.name !== 'rich_card') continue;
+        let spec = null;
+        try {
+          spec = specOf(root);
+        } catch (error) {
+          spec = null;
+        }
+        const usable =
+          spec &&
+          ((typeof spec.title === 'string' && spec.title.trim() !== '') ||
+            (Array.isArray(spec.blocks) && spec.blocks.length > 0));
+        if (usable) return spec;
+      }
+      return null;
+    }
+
+    /**
+     * Rendered at the end of a completed Turn, outside the folded process log, so the
+     * answer card stays visible instead of living behind a dropdown.
+     */
+    function TurnCard(props) {
+      let chat = null;
+      try {
+        chat = typeof props.useChat === 'function' ? props.useChat((state) => state) : null;
+      } catch (error) {
+        chat = null;
+      }
+      const spec = React.useMemo(
+        function () {
+          try {
+            return cardOf(chat, props.turn);
+          } catch (error) {
+            return null;
+          }
+        },
+        [chat, props.turn],
+      );
+      if (!spec) return null;
+      try {
+        return h('div', { className: 'rc-turn' }, h(Card, { spec }));
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function RichCardView(props) {
+      // The settled card renders once, by TurnCard at the end of the Turn, outside the
+      // folded process log. Keep only the streaming placeholder here so the same card
+      // does not appear twice.
+      if (props && (props.phase === 'preparing' || props.phase === 'start')) return h(Skeleton, null);
+      return null;
+    }
 
     function parseFence(pre) {
       const text = (pre.textContent || '').trim();
@@ -815,7 +918,7 @@ window.__ModuleLoader__.load({
       inject: ['slots'],
       apply(ctx) {
         const style = document.createElement('style');
-        style.setAttribute('data-dsh-folio-cards', '');
+        style.setAttribute('data-dsh-rich-cards', '');
         style.textContent = CSS;
         document.head.appendChild(style);
 
@@ -830,8 +933,22 @@ window.__ModuleLoader__.load({
           }
         } catch (error) {}
 
-        ctx.effect(() => installCardFences(), 'dsh-folio-cards: card fences');
+        ctx.effect(() =>
+          ctx.slots.inject('conversation.chat.turnTail', () =>
+            ctx.slots.register(
+              { name: 'conversation.chat.turnTail', id: 'rich-card-answer', order: 5 },
+              TurnCard,
+            ),
+          ),
+        );
 
+        ctx.effect(() => installCardFences(), 'dsh-rich-cards: card fences');
+
+        ctx.effect(() =>
+          ctx.slots.inject('tool.call.toolview', () =>
+            ctx.slots.register({ name: 'tool.call.toolview', key: 'rich_card' }, RichCardView),
+          ),
+        );
       },
     };
   },
