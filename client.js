@@ -1459,6 +1459,12 @@ window.__ModuleLoader__.load({
           const lines = ['PROBE ALIVE v4'];
           lines.push(safe('ctx keys', () => Object.keys(ctx).join(',')));
           lines.push(safe('remote', () => (remote ? Object.keys(remote).join(',') : 'unavailable')));
+          lines.push(safe('methods', () => {
+            const ns = remote && remote.pluginManager;
+            const meta = ns && ns.methods;
+            if (!meta) return 'no methods map';
+            return Object.keys(meta).slice(0, 24).join(',');
+          }));
           lines.push(
             safe('remote.pluginManager', () => {
               const ns = remote && remote.pluginManager;
@@ -1482,7 +1488,8 @@ window.__ModuleLoader__.load({
           const ns = remote && remote.pluginManager;
           const fn = ns && ns[method];
           if (typeof fn !== 'function') throw new Error('remote.pluginManager.' + method + ' 不可用');
-          return fn.call(ns, payload);
+          // RPC façade counts business arguments; pad to three so the arity check passes
+          return fn.call(ns, payload, undefined, undefined);
         };
         const btn = (text, onClick) =>
           h('button', { type: 'button', onClick, style: { marginRight: '8px' } }, text);
