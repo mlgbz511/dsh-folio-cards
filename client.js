@@ -1454,18 +1454,15 @@ window.__ModuleLoader__.load({
         const bind = (name) => {
           try { return ctx[name] || null; } catch (error) { return null; }
         };
-        const conn = bind('connection');
-        const remote = bind('remote');
+        const pm = bind('remote');
         const report = () => {
-          const lines = ['PROBE ALIVE'];
+          const lines = ['PROBE ALIVE v4'];
           lines.push(safe('ctx keys', () => Object.keys(ctx).join(',')));
-          lines.push(safe('connection', () => (conn ? Object.keys(conn).join(',') : 'unavailable')));
-          lines.push(safe('connection.rpc', () => (conn && conn.rpc ? Object.keys(conn.rpc).join(',') : 'unavailable')));
-          lines.push(safe('remote', () => (remote ? Object.keys(remote).join(',') : 'unavailable')));
+          lines.push(safe('remote', () => (pm ? Object.keys(pm).join(',') : 'unavailable')));
           lines.push(
             safe('remote.pluginManager', () => {
-              const pm = remote && remote.pluginManager;
-              return pm ? Object.keys(pm).join(',') : 'unavailable';
+              const ns = pm && pm.pluginManager;
+              return ns ? Object.keys(ns).join(',') : 'unavailable';
             }),
           );
           return lines.join('\n');
@@ -1474,47 +1471,39 @@ window.__ModuleLoader__.load({
           setOut(label + ' -> 请求中…');
           try {
             Promise.resolve(invoke()).then(
-              (res) => setOut(label + ' -> OK ' + JSON.stringify(res).slice(0, 500)),
+              (res) => setOut(label + ' -> OK ' + JSON.stringify(res).slice(0, 600)),
               (error) => setOut(label + ' -> ERR ' + String((error && error.message) || error).slice(0, 400)),
             );
           } catch (error) {
             setOut(label + ' -> THROW ' + String((error && error.message) || error).slice(0, 400));
           }
         };
-        const rpc = (endpoint, method, payload) => () => {
-          if (!conn || !conn.rpc || typeof conn.rpc.call !== 'function') throw new Error('connection.rpc.call 不可用');
-          return conn.rpc.call('/api', endpoint, { method, payload });
-        };
-        const remoteCall = (method, payload) => () => {
-          const pm = remote && remote.pluginManager;
-          const fn = pm && pm[method];
+        const call = (method, payload) => () => {
+          const ns = pm && pm.pluginManager;
+          const fn = ns && ns[method];
           if (typeof fn !== 'function') throw new Error('remote.pluginManager.' + method + ' 不可用');
-          return fn.call(pm, payload);
+          return fn.call(ns, payload);
         };
         const btn = (text, onClick) =>
           h('button', { type: 'button', onClick, style: { marginRight: '8px' } }, text);
         return h(
           'div',
           null,
-          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针 v3'),
+          h('div', { className: 'rc-title', role: 'heading', 'aria-level': 3 }, 'Folio 深度探针 v4'),
           h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '12px' } }, report()),
           h(
             'div',
             { style: { margin: '10px 0' } },
-            btn('A: rpc {id,config}', () => run('A', rpc('pluginManager', 'updateBundle', { id: 'folio-cards', config: { depth: 'verbose' } }))),
-            btn('B: rpc {id,depth}', () => run('B', rpc('pluginManager', 'updateBundle', { id: 'folio-cards', depth: 'verbose' }))),
-            btn('C: remote call', () => run('C', remoteCall('updateBundle', { id: 'folio-cards', config: { depth: 'verbose' } }))),
-            btn('D: rpc inspect', () => run('D', rpc('pluginManager', 'inspect', { id: 'folio-cards' }))),
+            btn('A: listPlugins', () => run('A', call('listPlugins', {}))),
+            btn('B: inspect', () => run('B', call('inspect', { id: 'folio-cards' }))),
+            btn('C: update {id,config}', () => run('C', call('updateBundle', { id: 'folio-cards', config: { depth: 'verbose' } }))),
+            btn('D: update {name,config}', () => run('D', call('updateBundle', { name: 'dsh-folio-cards', config: { depth: 'verbose' } }))),
           ),
           h('pre', { style: { whiteSpace: 'pre-wrap', fontSize: '12px' } }, out),
         );
       }
       return Panel;
     }
-
-    return {
-      inject: ['slots', 'connection', 'remote'],
-      // 供 tests/table.test.mjs 断言的纯函数出口；浏览器里没人读它。
       __test: {
         tableSpec: tableSpec,
         Table: Table,
