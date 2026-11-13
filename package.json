@@ -1,6 +1,6 @@
 {
   "name": "dsh-rich-cards",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "type": "module",
   "description": "Rich, typographic answer cards in the DSH Web conversation.",

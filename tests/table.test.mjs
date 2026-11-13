@@ -31,14 +31,15 @@ const all = (root, pred) => {
 // 1) 3 列 1 行：无滚动壳、无 sticky
 const small = { headers: ['方案', '上下文', '策略'], rows: [['桌面端', '1M', '常驻']] };
 const smallTree = Table({ block: small });
-assert.equal(all(smallTree, (n) => n.props.className === 'rc-table-scroll').length, 0, 'small table must not scroll');
+assert.equal(all(smallTree, (n) => String(n.props.className).includes('rc-table-scroll')).length, 1, 'every table gets a scroll container');
+assert.equal(all(smallTree, (n) => String(n.props.className).includes('rc-table-scroll-tall')).length, 0, 'small table must not cap its height');
 assert.equal(all(smallTree, (n) => String(n.props.className).includes('rc-table-sticky')).length, 0, 'small table must not pin first column');
 
 // 2) 4 列 8 行：滚动壳 + sticky
 const rows8 = Array.from({ length: 8 }, (_, i) => ['r' + i, '1' + i, 'site-' + i, 'ok']);
 const big = { headers: ['方案', '上下文', '区域', '策略'], rows: rows8 };
 const bigTree = Table({ block: big });
-assert.equal(all(bigTree, (n) => n.props.className === 'rc-table-scroll').length, 1, 'big table must scroll');
+assert.equal(all(bigTree, (n) => String(n.props.className).includes('rc-table-scroll-tall')).length, 1, 'big table caps its height');
 assert.ok(all(bigTree, (n) => String(n.props.className).includes('rc-table-sticky')).length > 0, '4 columns must pin first column');
 
 // 3) 分组行

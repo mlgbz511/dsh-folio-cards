@@ -410,7 +410,8 @@ window.__ModuleLoader__.load({
   border-radius: 6px;
   overflow: hidden;
 }
-.rc-table-scroll { max-height: 320px; overflow: auto; scrollbar-width: thin; }
+.rc-table-scroll { overflow-x: auto; scrollbar-width: thin; }
+.rc-table-scroll-tall { max-height: 320px; overflow-y: auto; }
 .rc-table {
   width: 100%;
   border-collapse: separate;
@@ -444,8 +445,19 @@ window.__ModuleLoader__.load({
 .rc-table tbody tr:hover td {
   background: color-mix(in oklab, var(--dsw-alias-label-primary) 4%, transparent);
 }
-.rc-table td:first-child { font-weight: 500; }
-.rc-table .n { text-align: right; font-variant-numeric: tabular-nums; }
+.rc-table th:first-child,
+.rc-table td:first-child {
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 4.5em;
+}
+.rc-table .n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rc-table th,
+.rc-table td {
+  min-width: 5.5em;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
 .rc-table thead th.n { text-align: right; }
 .rc-table-sticky thead th:first-child,
 .rc-table-sticky tbody td:first-child {
@@ -687,7 +699,7 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'rc-table-shell', 'data-fold': '1', 'data-cols': spec.width },
-        scroll ? h('div', { className: 'rc-table-scroll' }, table) : table,
+        h('div', { className: scroll ? 'rc-table-scroll rc-table-scroll-tall' : 'rc-table-scroll' }, table),
       );
     }
 
