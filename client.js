@@ -1454,14 +1454,14 @@ window.__ModuleLoader__.load({
         const bind = (name) => {
           try { return ctx[name] || null; } catch (error) { return null; }
         };
-        const pm = bind('remote');
+        const remote = bind('remote');
         const report = () => {
           const lines = ['PROBE ALIVE v4'];
           lines.push(safe('ctx keys', () => Object.keys(ctx).join(',')));
-          lines.push(safe('remote', () => (pm ? Object.keys(pm).join(',') : 'unavailable')));
+          lines.push(safe('remote', () => (remote ? Object.keys(remote).join(',') : 'unavailable')));
           lines.push(
             safe('remote.pluginManager', () => {
-              const ns = pm && pm.pluginManager;
+              const ns = remote && remote.pluginManager;
               return ns ? Object.keys(ns).join(',') : 'unavailable';
             }),
           );
@@ -1479,7 +1479,7 @@ window.__ModuleLoader__.load({
           }
         };
         const call = (method, payload) => () => {
-          const ns = pm && pm.pluginManager;
+          const ns = remote && remote.pluginManager;
           const fn = ns && ns[method];
           if (typeof fn !== 'function') throw new Error('remote.pluginManager.' + method + ' 不可用');
           return fn.call(ns, payload);
@@ -1504,6 +1504,9 @@ window.__ModuleLoader__.load({
       }
       return Panel;
     }
+    return {
+      inject: ['slots', 'connection', 'remote', 'remote.pluginManager'],
+      // 供 tests/table.test.mjs 断言的纯函数出口；浏览器里没人读它。
       __test: {
         tableSpec: tableSpec,
         Table: Table,
