@@ -23,7 +23,7 @@ dsh plugin --profile <你的 profile> add link:<本仓库绝对路径>
 | `concise` 精简 | ≤2 句 | 卡即答案 |
 | `auto` 自动（默认） | 模型按「事实类→精简 / 为什么→适中 / 诊断与方案→详尽」自选 | 同上 |
 
-设置方式二选一：
+设置方式只有一个：改宿主配置（DSH 的设置页不会显示本插件的项，原因见下）。
 
 ```yaml
 # profiles/<profile>/cordis.patch.yml
@@ -33,7 +33,9 @@ dsh plugin --profile <你的 profile> add link:<本仓库绝对路径>
     depth: auto
 ```
 
-或插件管理器里若出现设置表单，直接在那里改。改完**完整退出 App 再开**生效；非法值一律回落 `auto`，不会让插件加载失败。
+改完**完整退出 App 再开**生效；非法值一律回落 `auto`，不会让插件加载失败。
+
+没有设置页的原因：DSH 设置页只显示自己注册了设置节的插件，而把值写回宿主配置要经过 `remote.pluginManager` 的 spec 形状——这套 RPC 没有公开文档，实测的报错记录在 [探针结论](docs/plans/2026-11-14_settings-page-probe.md)。
 
 ## 块类型
 

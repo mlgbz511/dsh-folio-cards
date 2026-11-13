@@ -1,6 +1,6 @@
 {
   "name": "dsh-folio-cards",
-  "version": "2.2.9",
+  "version": "2.3.0",
   "private": true,
   "type": "module",
   "description": "Typographic answer cards for the DSH Web conversation: thirteen blocks including a low-contrast grid table.",
@@ -26,9 +26,7 @@
       "platform": "web",
       "immediately": true,
       "inject": [
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-api-remotes"
+        "@deepseek-ai/dsh-client-ui-conversation"
       ]
     }
   },
