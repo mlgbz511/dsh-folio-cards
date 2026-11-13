@@ -1,5 +1,5 @@
 /**
- * Client half of `dsh-rich-cards`.
+ * Client half of `dsh-folio-cards`.
  *
  * Registers a Tool call view for the `rich_card` tool and draws the persisted
  * arguments as a typographic card. Nothing here owns state: the card is a pure
@@ -7,7 +7,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: 'dsh-rich-cards',
+  id: 'dsh-folio-cards',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -1133,7 +1133,7 @@ window.__ModuleLoader__.load({
       __test: { tableSpec: tableSpec, Table: Table, Card: Card },
       apply(ctx) {
         const style = document.createElement('style');
-        style.setAttribute('data-dsh-rich-cards', '');
+        style.setAttribute('data-dsh-folio-cards', '');
         style.textContent = CSS;
         document.head.appendChild(style);
 
@@ -1157,7 +1157,7 @@ window.__ModuleLoader__.load({
           ),
         );
 
-        ctx.effect(() => installCardFences(), 'dsh-rich-cards: card fences');
+        ctx.effect(() => installCardFences(), 'dsh-folio-cards: card fences');
 
         ctx.effect(() =>
           ctx.slots.inject('tool.call.toolview', () =>

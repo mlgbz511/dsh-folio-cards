@@ -1,5 +1,5 @@
 /**
- * Host half of `dsh-rich-cards`.
+ * Host half of `dsh-folio-cards`.
  *
  * Teaches the model to end a reply with a fenced `card` block, and leaves the rendering to the
  * Client half, which upgrades that fenced block into a card in place. The `rich_card` tool below
@@ -311,16 +311,16 @@ export function apply(ctx) {
           return normalize(args);
         },
       }),
-    'dsh-rich-cards: rich_card tool',
+    'dsh-folio-cards: rich_card tool',
   );
 
   ctx.effect(
     () =>
       ctx.systemPrompt.section({
-        name: 'rich-answer-cards',
+        name: 'folio-cards',
         order: 34,
         text: GUIDE,
       }),
-    'dsh-rich-cards: prompt guidance',
+    'dsh-folio-cards: prompt guidance',
   );
 }

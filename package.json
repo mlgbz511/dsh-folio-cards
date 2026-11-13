@@ -1,9 +1,9 @@
 {
-  "name": "dsh-rich-cards",
-  "version": "1.4.2",
+  "name": "dsh-folio-cards",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Rich, typographic answer cards in the DSH Web conversation.",
+  "description": "Typographic answer cards for the DSH Web conversation: thirteen blocks including a low-contrast grid table.",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -29,5 +29,11 @@
         "@deepseek-ai/dsh-client-ui-conversation"
       ]
     }
-  }
+  },
+  "keywords": [
+    "dsh-plugin",
+    "cards",
+    "table",
+    "typography"
+  ]
 }

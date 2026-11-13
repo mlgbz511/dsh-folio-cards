@@ -2,7 +2,7 @@
 
 让 DeepSeek Harness 的解释类回答带一张排过版的卡片：结论、要点、数据、时间线、多列对照表。
 
-基于 [ninepoin4/dsh-rich-cards](https://github.com/ninepoin4/dsh-rich-cards)（MIT）的上游源码（`fe6a86e`），在自有仓库继续演进：新增 `table` 块、把表格从「能放」变成「该放时就放」。
+包名 `dsh-folio-cards`，仓库同名。上游 [ninepoin4/dsh-rich-cards](https://github.com/ninepoin4/dsh-rich-cards)（MIT）的源码快照 `fe6a86e` 是它的起点；此后新增 `table` 块、把表格从「能放」变成「该放时就放」，2.0.0 起改用现在的包名与区段名，与上游不再共享标识。
 
 ## 装
 
@@ -79,9 +79,9 @@ GUIDE（宿主注入的系统提示段）规定：
 
 ## 与上游的差异
 
-| | 上游 `dsh-rich-cards` | 本仓库 |
+| | 上游 `dsh-rich-cards` | 本仓库 `dsh-folio-cards` |
 | --- | --- | --- |
-| 版本 | 1.2.4 | 1.4.0 |
+| 包名 / 版本 | `dsh-rich-cards` 1.2.4 | `dsh-folio-cards` 2.0.0 |
 | 块类型 | 12 | 13（+`table`）|
 | 表格 | 无，只能 `kv` 两列 | V5 网格 + sticky 首列 + 数值对齐 + 吸顶 + 窄屏折叠 |
 | 提示词 | 无表格判据 | 3×3 强制用表 + 最小示例 |
