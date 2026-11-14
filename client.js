@@ -724,6 +724,14 @@ window.__ModuleLoader__.load({
     content: none;
   }
 }
+
+/* Mermaid：DSH 自己没有图表渲染，这里把 \`\`\`mermaid 围栏升级成内联 SVG。
+   加载失败、语法错误、CSP 拦截都只会留下原代码块（fail-open），不影响其它内容。 */
+.rc-mermaid { margin: 14px 0; padding: 12px; border-radius: 8px;
+  border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
+  background: var(--dsw-alias-bg-layer-1); overflow: auto; }
+.rc-mermaid svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+
 `;
 
     function text(value) {
@@ -1417,6 +1425,67 @@ window.__ModuleLoader__.load({
      * A blob that does not parse is left alone and stays visible as source: failing open
      * is the whole point, because a malformed card must never break the answer.
      */
+    const MERMAID_URL = '/folio-cards/mermaid.min.js';
+    const MERMAID_SEEN = 'data-folio-mermaid';
+    let mermaidPending = null;
+
+    function loadMermaid() {
+      if (window.mermaid) return Promise.resolve(window.mermaid);
+      if (mermaidPending) return mermaidPending;
+      mermaidPending = new Promise((resolve, reject) => {
+        try {
+          const script = document.createElement('script');
+          script.src = MERMAID_URL;
+          script.async = true;
+          script.onload = () => (window.mermaid ? resolve(window.mermaid) : reject(new Error('mermaid global missing')));
+          script.onerror = () => reject(new Error('mermaid asset unreachable'));
+          document.head.appendChild(script);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      return mermaidPending;
+    }
+
+    /** 把 \`\`\`mermaid 围栏换成内联 SVG；任何失败都保留原代码块。 */
+    function installMermaid() {
+      let started = false;
+      const upgrade = async () => {
+        const nodes = Array.from(document.querySelectorAll('pre code.language-mermaid'));
+        for (const code of nodes) {
+          const pre = code.parentElement;
+          if (!pre || pre.getAttribute(MERMAID_SEEN)) continue;
+          const source = (code.textContent || '').trim();
+          if (!source) continue;
+          pre.setAttribute(MERMAID_SEEN, 'pending');
+          try {
+            const mermaid = await loadMermaid();
+            mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
+            const id = 'rc-mermaid-' + Math.random().toString(36).slice(2, 10);
+            const { svg } = await mermaid.render(id, source);
+            const box = document.createElement('div');
+            box.className = 'rc-mermaid';
+            box.setAttribute(MERMAID_SEEN, 'ok');
+            box.innerHTML = svg;
+            pre.replaceWith(box);
+          } catch (error) {
+            pre.setAttribute(MERMAID_SEEN, 'failed');
+          }
+        }
+      };
+      const kick = () => {
+        if (started) return;
+        started = true;
+        void upgrade();
+      };
+      kick();
+      const observer = new MutationObserver(() => {
+        if (document.querySelector('pre code.language-mermaid:not([data-folio-mermaid])')) kick();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      return () => observer.disconnect();
+    }
+
     function installCardFences() {
       let ReactDOM = null;
       try {
@@ -1583,6 +1652,8 @@ window.__ModuleLoader__.load({
         );
 
         ctx.effect(() => installCardFences(), 'dsh-folio-cards: card fences');
+
+        if (document.body) ctx.effect(() => installMermaid(), 'dsh-folio-cards: mermaid');
 
         ctx.effect(() =>
           ctx.slots.inject('tool.call.toolview', () =>

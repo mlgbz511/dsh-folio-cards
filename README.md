@@ -24,6 +24,25 @@ dsh plugin --profile <你的 profile> add link:<本仓库绝对路径>
 
 想恢复四档（`1/2/3/0` + `/depth` 命令 + patch 热重载）：回退到 `2.7.1`，或看该版本提交 `beb38e1`/`2406ad1` 的实现。
 
+## Mermaid 图表
+
+DSH 本身不认 `mermaid` 语言（前端包里 mermaid/dagre/flowchart 出现 0 次），所以模型画流程图时只会落成代码块。本插件把它补上：
+
+```
+模型写 ```mermaid flowchart TB ...```  →  插件升级成内联 SVG
+```
+
+机制（**不动 DSH 本体**）：
+
+1. 宿主半把 `vendor/mermaid.min.js` 用 `webServer.register` 暴露成 `/folio-cards/mermaid.min.js`；
+2. 客户端半发现有 `pre code.language-mermaid` 时，**首次按需**加载该脚本（同 origin），调用 `mermaid.render` 换成 `div.rc-mermaid > svg`；
+3. 任一环节失败（路由 404、脚本加载失败、语法错误、CSP 拦截）→ 保留原代码块，只打上 `data-folio-mermaid="failed"` 标记，**不影响其它内容**。
+
+代价与出处：
+
+- `vendor/mermaid.min.js` 约 3.5 MB，构建物随仓库一起分发（MIT，见 `vendor/mermaid.LICENSE`）；不联网也能用；
+- 这是本插件唯一"体积大"的部分；不用 mermaid 时可以整个删掉 `vendor/` 与 client 里的 `installMermaid`，其余功能不受影响。
+
 ## 正文表格皮肤
 
 DSH 自己渲染的 markdown 表格（正文里 `| a | b |` 那种）现在与卡片里的表格同一套观感：低对比网格、表头次级色、首列不折、窄屏折成堆叠。

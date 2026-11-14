@@ -7,6 +7,9 @@
  * (MALFORMED_RESPONSE), while a malformed fence merely stays visible as source.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Schema from '@deepseek-ai/schemastery';
 
 const REGISTER_TOOL = false;
@@ -313,6 +316,9 @@ function presentCall(args) {
 
 export const inject = ['tools', 'systemPrompt'];
 
+/** 客户端要用的 mermaid UMD 包（vendor/，MIT）。缺文件时路由挂不上，客户端会自动退回代码块。 */
+const MERMAID_FILE = join(dirname(fileURLToPath(import.meta.url)), 'vendor', 'mermaid.min.js');
+
 export function apply(ctx) {
   if (REGISTER_TOOL) ctx.effect(
     () =>
@@ -330,6 +336,30 @@ export function apply(ctx) {
       }),
     'dsh-folio-cards: rich_card tool',
   );
+
+  // 把 mermaid 包以静态资源暴露给渲染进程：客户端按同一 origin 的相对路径加载。
+  ctx.inject(['webServer'], (webCtx) => {
+    ctx.effect(() => {
+      if (!existsSync(MERMAID_FILE)) return () => {};
+      return webCtx.webServer.register({
+        kind: 'exact',
+        path: '/folio-cards/mermaid.min.js',
+        handler(req, res) {
+          try {
+            const body = readFileSync(MERMAID_FILE);
+            res.writeHead(200, {
+              'content-type': 'text/javascript; charset=utf-8',
+              'cache-control': 'public, max-age=86400',
+            });
+            res.end(body);
+          } catch (error) {
+            res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+            res.end('mermaid unavailable');
+          }
+        },
+      });
+    }, 'dsh-folio-cards: mermaid asset');
+  });
 
   ctx.effect(
     () =>
