@@ -755,9 +755,9 @@ window.__ModuleLoader__.load({
 .rc-mermaid { margin: 14px 0; padding: 12px; border-radius: 8px;
   border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
   background: var(--dsw-alias-bg-layer-1); overflow: auto; }
-/* 不把图压到容器宽度：保持自然尺寸，容器负责滚动，字才读得清。 */
-.rc-mermaid svg { max-width: none; width: auto; height: auto; display: block; margin: 0 auto; }
-.rc-mermaid { max-height: 70vh; }
+/* 卡片里按宽度铺满（不裁切、不留空白），超高时纵向滚动；要看清细节请点开放大。 */
+.rc-mermaid { max-height: 70vh; overflow: auto; display: block; }
+.rc-mermaid svg { width: 100%; height: auto; max-width: 100%; display: block; }
 .rc-mermaid { cursor: zoom-in; }
 .rc-mermaid:focus-visible { outline: 2px solid var(--dsw-alias-state-warning-primary); outline-offset: 2px; }
 .rc-mermaid-zoom { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center;
@@ -1589,6 +1589,19 @@ window.__ModuleLoader__.load({
         const sync = () => {
           svg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
         };
+
+        // 打开时先整图适配视口（否则自然尺寸的大图会直接被裁掉四周）。
+        const fit = () => {
+          svg.style.transform = 'none';
+          const r = svg.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          scale = Math.min(1, (vw * 0.92) / r.width, (vh * 0.86) / r.height);
+          tx = (vw - r.width * scale) / 2 - r.left;
+          ty = (vh - r.height * scale) / 2 - r.top;
+          sync();
+        };
         // 以光标位置为锚点缩放：光标下的那个点缩放前后保持不动。
         box.addEventListener(
           'wheel',
@@ -1625,12 +1638,16 @@ window.__ModuleLoader__.load({
         };
         svg.addEventListener('pointerup', stop);
         svg.addEventListener('pointercancel', stop);
+        let fitted = false;
         svg.addEventListener('dblclick', (event) => {
           event.stopPropagation();
-          scale = 1;
-          tx = 0;
-          ty = 0;
-          sync();
+          fit();
+        });
+        // 首帧后再适配：此刻 SVG 已挂到文档里，量到的才是真实尺寸。
+        requestAnimationFrame(() => {
+          if (fitted) return;
+          fitted = true;
+          fit();
         });
 
         box.appendChild(svg);
