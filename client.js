@@ -755,9 +755,13 @@ window.__ModuleLoader__.load({
 .rc-mermaid { margin: 14px 0; padding: 12px; border-radius: 8px;
   border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
   background: var(--dsw-alias-bg-layer-1); overflow: auto; }
-/* 卡片里按宽度铺满（不裁切、不留空白），超高时纵向滚动；要看清细节请点开放大。 */
-.rc-mermaid { max-height: 70vh; overflow: auto; display: block; }
-.rc-mermaid svg { width: 100%; height: auto; max-width: 100%; display: block; }
+/* 卡片里固定高度预览：宽高双向适配到框内，不裁切也不把版面撑爆；细节交给点开放大。 */
+.rc-mermaid { position: relative; max-height: min(46vh, 420px); min-height: 200px;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.rc-mermaid svg { max-width: 100%; max-height: min(46vh, 420px); width: auto; height: auto; display: block; }
+.rc-mermaid::after { content: '点击放大'; position: absolute; right: 8px; bottom: 6px; padding: 2px 8px;
+  border-radius: 999px; font-size: 11px; line-height: 1.6; pointer-events: none;
+  color: var(--dsw-alias-label-secondary); background: color-mix(in oklab, #000 45%, transparent); }
 .rc-mermaid { cursor: zoom-in; }
 .rc-mermaid:focus-visible { outline: 2px solid var(--dsw-alias-state-warning-primary); outline-offset: 2px; }
 /* 顶部留出窗口标题栏（原生 X 按钮在那一层，遮住它会误触关窗口）。 */

@@ -119,6 +119,9 @@ assert.ok(client.includes("box.addEventListener('pointerdown'"), 'the whole over
 assert.ok(!/box\.addEventListener\('click',[\s\S]{0,200}closeZoom\(\)/.test(client), 'a background click no longer closes it');
 assert.ok(client.includes('user-select: none'), 'dragging does not select text');
 assert.ok(client.includes("fontSize: '18px'"), 'labels are 18px');
+// 卡片里的图必须固定高度，双向适配，不把版面撑爆
+assert.ok(client.includes('max-height: min(46vh, 420px)'), 'inline preview has a fixed height cap');
+assert.ok(client.includes("content: '点击放大'"), 'inline preview hints that it can be opened');
 assert.ok(/fontSize: '(1[6-9]|[2-9][0-9])px'/.test(client), 'labels are at least 16px');
 assert.ok(client.includes('getBoundingClientRect'), 'wheel zoom reads the live box');
 assert.ok(client.includes('1 - next / scale'), 'wheel zoom compensates the pan so the cursor stays put');
