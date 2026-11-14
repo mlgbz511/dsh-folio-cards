@@ -630,6 +630,8 @@ window.__ModuleLoader__.load({
    探针：<html data-folio-mdtable-probe="1"> 时给表格加 1px 虚线描边，
    默认关闭，只用于确认选择器是否命中。
    回退：删掉本段即恢复原生表格，无其它副作用。 */
+/* 正文表格皮肤：已停用（DSH 原生表格优先）。要恢复，删掉下面 @media (min-width: 100000px) 这层外壳即可。 */
+@media (min-width: 100000px) {
 /* 容器用查证过的 CSS Module 局部名（class 属性子串匹配，哈希段随构建变化不可硬编码）；
    表格自身无类名，所以只能靠父 div 后代选择器命中。 */
 /* 外框画在包裹层上：画在 table 上会被滚动容器的边裁掉（就是"边角被吞"的原因）。 */
@@ -744,6 +746,8 @@ window.__ModuleLoader__.load({
   :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) td:not([data-label]))::before {
     content: none;
   }
+}
+
 }
 
 /* Mermaid：DSH 自己没有图表渲染，这里把 \`\`\`mermaid 围栏升级成内联 SVG。
@@ -1809,7 +1813,9 @@ window.__ModuleLoader__.load({
         ctx.effect(() => installCardFences(), 'dsh-folio-cards: card fences');
 
         if (document.body) ctx.effect(() => installMermaid(), 'dsh-folio-cards: mermaid');
-        if (document.body) ctx.effect(() => installMdProbe(), 'dsh-folio-cards: md table probe');
+        // 表格皮肤停用期间，探针也不注册（恢复皮肤时一并打开）。
+        const MD_TABLE_SKIN = false;
+        if (MD_TABLE_SKIN && document.body) ctx.effect(() => installMdProbe(), 'dsh-folio-cards: md table probe');
 
         ctx.effect(() =>
           ctx.slots.inject('tool.call.toolview', () =>

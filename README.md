@@ -44,7 +44,12 @@ DSH 本身不认 `mermaid` 语言（前端包里 mermaid/dagre/flowchart 出现 
 - `vendor/mermaid.min.js` 约 3.5 MB，构建物随仓库一起分发（MIT，见 `vendor/mermaid.LICENSE`）；不联网也能用；
 - 这是本插件唯一"体积大"的部分；不用 mermaid 时可以整个删掉 `vendor/` 与 client 里的 `installMermaid`，其余功能不受影响。
 
-## 正文表格皮肤
+## 正文表格皮肤（当前停用）
+
+> 状态：**已停用**。CSS 规则仍保留在 `client.js` 里，但被包在 `@media (min-width: 100000px)` 这种永不成立的外壳中，DSH 原生表格样式完全接管；调试用的探针也不再注册。
+> 恢复方法：删掉那层 `@media` 外壳，并把 `MD_TABLE_SKIN` 改回 `true`。
+
+原设计如下（保留供回滚参考）：
 
 DSH 自己渲染的 markdown 表格（正文里 `| a | b |` 那种）现在与卡片里的表格同一套观感：低对比网格、表头次级色、首列不折、窄屏折成堆叠。
 

@@ -13,6 +13,9 @@ const code = source
 
 // 1) 必须存在探针开关
 assert.ok(source.includes('data-folio-mdtable-probe'), 'probe attribute present');
+// 皮肤当前是停用状态：规则被包在不生效的 media 外壳里，探针也不注册
+assert.ok(source.includes('@media (min-width: 100000px)'), 'skin wrapped in an inert media query');
+assert.ok(source.includes('MD_TABLE_SKIN = false'), 'probe stays off while the skin is disabled');
 
 // 2) 新皮肤段内禁止 !important（样式表其它历史规则不受这条约束）
 const skinAt = code.indexOf("class*='tableScroll'");
