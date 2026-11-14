@@ -77,6 +77,7 @@ const countMode = (mode) => {
     callout: nodes.filter((n) => n.props && n.props.className === 'rc-callout').length,
     verdict: nodes.filter((n) => n.props && n.props.className === 'rc-verdict').length,
     code: nodes.filter((n) => n.props && n.props.className === 'rc-code').length,
+    bullets: nodes.filter((n) => n.props && n.props.className === 'rc-ul').length,
     toggle: nodes.filter((n) => n.props && n.props.className === 'rc-density').length,
     pressed: nodes
       .filter((n) => n.type === 'button' && n.props && n.props['aria-pressed'] === 'true')
@@ -95,8 +96,9 @@ assert.equal(mid.code, 1, 'mid keeps the code block');
 assert.equal(mid.callout, 0, 'mid drops callouts');
 assert.equal(full.callout, 1, 'full keeps callouts');
 assert.equal(lean.verdict, 1, 'lean keeps the verdict');
-assert.equal(lean.code, 0, 'lean drops the code block');
+assert.equal(lean.code, 1, 'lean keeps one content block (the code)');
 assert.equal(lean.callout, 0, 'lean drops callouts');
+assert.equal(lean.bullets, 0, 'lean drops the second content block');
 
 delete globalThis.window.localStorage;
 console.log('RENDER-OK');

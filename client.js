@@ -1210,8 +1210,15 @@ window.__ModuleLoader__.load({
       const visible = (() => {
         if (density === 'full') return blocks;
         if (density === 'mid') return blocks.filter((block) => text(block && block.type) !== 'callout');
-        const verdictAt = blocks.findIndex((block) => text(block && block.type) === 'verdict');
-        return verdictAt >= 0 ? [blocks[verdictAt]] : blocks.slice(0, 1);
+        // 简：结论 + 一块真正的内容（表 > 代码 > 要点 > 统计 > 段落），最多两块。
+        const CONTENT = ['table', 'code', 'bullets', 'steps', 'stats', 'kv', 'paragraph'];
+        const typeOf = (block) => text(block && block.type);
+        const keep = [];
+        const verdict = blocks.find((block) => typeOf(block) === 'verdict');
+        if (verdict) keep.push(verdict);
+        const content = blocks.find((block) => block !== verdict && CONTENT.indexOf(typeOf(block)) >= 0);
+        if (content) keep.push(content);
+        return keep.length ? keep : blocks.slice(0, 1);
       })();
       const body = visible.map((block, index) => renderBlock(block, index)).filter(Boolean);
       const layout = text(spec.layout) === 'article' ? 'article' : 'card';

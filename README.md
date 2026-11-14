@@ -47,7 +47,7 @@ dsh plugin --profile <你的 profile> add link:<本仓库绝对路径>
 | --- | --- |
 | 详（默认） | 全部块 |
 | 中 | 去掉 `callout`（注脚类补充） |
-| 简 | 只留 `verdict`，没有 verdict 时留第一个块 |
+| 简 | 结论（`verdict`）+ 一块内容（表 → 代码 → 要点 → 统计 → 段落，取最先出现的一块），最多两块 |
 
 选择记在 `localStorage`（键 `folio-card-density`），下一张卡沿用。这条纯客户端，与上面的输出深度是两件事：深度决定模型写多少，密度决定你看多少。
 
