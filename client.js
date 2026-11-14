@@ -764,13 +764,21 @@ window.__ModuleLoader__.load({
 .rc-mermaid-zoom { position: fixed; inset: 34px 6px 6px 6px; z-index: 2147483000;
   display: flex; align-items: center; justify-content: center; padding: 2vmin;
   background: color-mix(in oklab, #000 88%, transparent); border-radius: 10px; cursor: zoom-out; }
-/* 不要给 SVG 加 filter：filter 会强制把图层栅格化，再缩放就是糊的（矢量变位图）。 */
+/* 两件都会把矢量变成位图、缩放后必糊：filter，以及 will-change: transform
+   （后者把元素提升为合成层，按 layout 尺寸栅格化一次，之后是 GPU 缩放那张位图）。
+   所以这里只开 transform，不加 will-change。 */
 .rc-mermaid-zoom svg { max-width: none; height: auto; transform-origin: 0 0;
-  will-change: transform; touch-action: none; cursor: grab; }
+  touch-action: none; cursor: grab; }
+.rc-mermaid-zoom svg text { text-rendering: geometricPrecision; }
 .rc-mermaid-zoom-close { position: absolute; top: 10px; right: 12px; width: 28px; height: 28px;
   display: flex; align-items: center; justify-content: center; border-radius: 6px; border: 0; cursor: pointer;
   font-size: 16px; line-height: 1; color: #e6e8ee; background: color-mix(in oklab, #fff 10%, transparent); }
 .rc-mermaid-zoom-close:hover { background: color-mix(in oklab, #fff 18%, transparent); }
+.rc-mermaid-zoom-tools { position: absolute; top: 10px; left: 12px; display: flex; gap: 6px; }
+.rc-mermaid-zoom-tools button { min-width: 32px; height: 28px; padding: 0 8px; border-radius: 6px; border: 0;
+  cursor: pointer; font-size: 12px; line-height: 1; color: #e6e8ee;
+  background: color-mix(in oklab, #fff 10%, transparent); }
+.rc-mermaid-zoom-tools button:hover { background: color-mix(in oklab, #fff 18%, transparent); }
 .rc-mermaid-zoom svg[data-dragging='1'] { cursor: grabbing; }
 .rc-mermaid-zoom-hint { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
   font-size: 12px; color: #cfd3da; opacity: .8; }
@@ -1573,7 +1581,7 @@ window.__ModuleLoader__.load({
         theme: 'dark',
         securityLevel: 'strict',
         useMaxWidth: false,
-        themeVariables: { fontSize: '16px', fontFamily: 'system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif' },
+        themeVariables: { fontSize: '18px', fontFamily: 'system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif' },
         flowchart: { useMaxWidth: false, curve: 'basis', nodeSpacing: 36, rankSpacing: 56, padding: 10 },
         sequence: { useMaxWidth: false },
         class: { useMaxWidth: false },
@@ -1722,6 +1730,20 @@ window.__ModuleLoader__.load({
         };
 
         // 双击在「整图适配」和「1:1 原始尺寸」之间切换。
+        const zoomBy = (factor) => {
+          const next = Math.min(6, Math.max(0.6, scale * factor));
+          if (next === scale) return;
+          const cx = window.innerWidth / 2;
+          const cy = window.innerHeight / 2;
+          const rect = svg.getBoundingClientRect();
+          const ox = cx - rect.left;
+          const oy = cy - rect.top;
+          tx = tx + ox * (1 - next / scale);
+          ty = ty + oy * (1 - next / scale);
+          scale = next;
+          sync();
+        };
+
         const centerAt = (next) => {
           svg.style.transform = 'none';
           const rect = svg.getBoundingClientRect();
@@ -1789,9 +1811,28 @@ window.__ModuleLoader__.load({
           closeZoom();
         });
 
+        const tools = document.createElement('div');
+        tools.className = 'rc-mermaid-zoom-tools';
+        const button = (label, title, action) => {
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.textContent = label;
+          el.title = title;
+          el.addEventListener('click', (event) => {
+            event.stopPropagation();
+            action();
+          });
+          tools.appendChild(el);
+        };
+        button('−', '缩小', () => zoomBy(0.8));
+        button('1:1', '原始尺寸', () => centerAt(1));
+        button('+', '放大', () => zoomBy(1.25));
+        button('整图', '整图适配', () => fit());
+
         box.appendChild(svg);
         box.appendChild(hint);
         box.appendChild(closeButton);
+        box.appendChild(tools);
         box.addEventListener('click', (event) => {
           if (event.target === svg || (event.target && event.target.closest && event.target.closest('svg'))) return;
           if (event.target === closeButton) return;

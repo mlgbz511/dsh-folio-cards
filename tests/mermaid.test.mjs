@@ -111,7 +111,11 @@ assert.ok(client.includes('const centerAt = (next)'), 'double click can switch t
 assert.ok(!/\.rc-mermaid-zoom svg \{[^}]*filter:/.test(client), 'no CSS filter on the zoomed svg (it rasterises and blurs)');
 assert.ok(client.includes('inset: 34px 6px 6px 6px'), 'overlay keeps clear of the window chrome');
 assert.ok(client.includes('rc-mermaid-zoom-close'), 'overlay has its own close button');
-assert.ok(client.includes("fontSize: '16px'"), 'labels are 16px');
+// 合成层栅格化是第二个模糊源：缩放元素上不许出现 will-change
+assert.ok(!/\.rc-mermaid-zoom svg \{[^}]*will-change:/.test(client), 'no will-change on the scaled svg');
+assert.ok(client.includes('rc-mermaid-zoom-tools'), 'overlay exposes zoom buttons');
+assert.ok(client.includes("fontSize: '18px'"), 'labels are 18px');
+assert.ok(/fontSize: '(1[6-9]|[2-9][0-9])px'/.test(client), 'labels are at least 16px');
 assert.ok(client.includes('getBoundingClientRect'), 'wheel zoom reads the live box');
 assert.ok(client.includes('1 - next / scale'), 'wheel zoom compensates the pan so the cursor stays put');
 assert.ok(client.includes("transformOrigin = '0 0'"), 'transform origin is top-left for cursor-anchored zoom');
