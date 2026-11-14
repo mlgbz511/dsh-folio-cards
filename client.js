@@ -632,16 +632,34 @@ window.__ModuleLoader__.load({
    回退：删掉本段即恢复原生表格，无其它副作用。 */
 /* 容器用查证过的 CSS Module 局部名（class 属性子串匹配，哈希段随构建变化不可硬编码）；
    表格自身无类名，所以只能靠父 div 后代选择器命中。 */
-:where(div[class*='tableScroll'], div[class*='tableFill']) > :where(table:not(.rc-table)) {
+/* 外框画在包裹层上：画在 table 上会被滚动容器的边裁掉（就是"边角被吞"的原因）。 */
+:where(div[class*='tableScroll'], div[class*='tableFill']) {
   margin: 14px 0 8px;
   border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
   border-radius: 6px;
+  background: transparent;
+  scrollbar-width: thin;
+}
+:where(div[class*='tableScroll'], div[class*='tableFill']) > :where(table:not(.rc-table)) {
+  margin: 0;
+  border: 0;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 13px;
   line-height: 1.5;
-  scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
+}
+/* 圆角补到四个角单元格上，这样内容不会盖住包裹层的圆角。 */
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) thead tr:first-child th:first-child) {
+  border-top-left-radius: 6px;
+}
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) thead tr:first-child th:last-child) {
+  border-top-right-radius: 6px;
+}
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) tbody tr:last-child td:first-child) {
+  border-bottom-left-radius: 6px;
+}
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) tbody tr:last-child td:last-child) {
+  border-bottom-right-radius: 6px;
 }
 /* 低对比网格：右边线 + 下边线，末列末行收边，避免双线。 */
 :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) th, table:not(.rc-table) td) {

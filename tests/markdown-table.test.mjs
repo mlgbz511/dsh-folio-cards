@@ -28,6 +28,10 @@ assert.equal(nakedTable, false, 'no naked "table {" rule');
 // 命中用的选择器必须是查证过的 CSS Module 局部名子串
 assert.ok(code.includes("class*='tableScroll'"), 'targets tableScroll wrapper');
 assert.ok(code.includes("class*='tableFill'"), 'targets tableFill wrapper');
+// 外框必须画在包裹层上（画在 table 上会被滚动容器裁掉边角）
+assert.ok(/:where\(div\[class\*='tableScroll'\][^{]*\{[^}]*border: 1px solid/.test(code), 'wrapper carries the outer border');
+assert.ok(code.includes('border-top-left-radius'), 'corner cells are rounded');
+assert.ok(!/table:not\(\.rc-table\)\) \{[^}]*border-radius: 6px/.test(code), 'table itself no longer carries a radius');
 // 这两类选择器在本构建里不存在（会静默失效），禁止再用
 assert.ok(!code.includes('[data-markdown]'), 'drops the non-existent [data-markdown]');
 assert.ok(!/\s\.markdown\s/.test(code), 'drops the non-existent .markdown container');
