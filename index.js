@@ -44,7 +44,7 @@ const DESCRIPTION = [
 
 const BASE_GUIDE = [
   '## Rich answer cards',
-  'A reply that explains rather than acts can end with one card: a fenced code block whose info',
+  'A reply that explains rather than acts MUST end with exactly one card: a fenced code block whose info',
   'string is `card` and whose body is a JSON object. The host renders that block as a typographic',
   'card in place, between the last line of prose and the cost row.',
   '',
@@ -56,7 +56,10 @@ const BASE_GUIDE = [
   'Rules:',
   '- Answer in full: write the complete explanation the question deserves. Never compress prose, tables',
   '  or code to make the card smaller.',
-  '- At most one card per reply, placed at the end. A short factual answer may be the card alone.',
+  '- One card per reply, at the end, mandatory whenever the reply explains or compares anything.',
+  '- Do not answer a comparison with markdown tables in prose: put the comparison into the card table',
+  '  block and keep the prose for the reasoning.',
+  '- A single-sentence reply, a bare code answer, or a question back to the user needs no card.',
   '- The card carries the verdict, the comparison or the code. It must not restate the prose; the',
   '  reasoning belongs in the prose and is never compressed to fit the card.',
   '- The body must parse as JSON: no line breaks or ASCII double quotes inside a string (use 「」), no',
@@ -92,8 +95,8 @@ const BASE_GUIDE = [
   '- code: pasted code always goes in a code block with its language, never inside paragraph text;',
   '  never truncate it. Inline identifiers stay inline with backticks.',
   '- Every string is plain text: no markdown, no bullet characters. Write in the user language.',
-  '- Skip the card for short factual replies, code or file work, status reports and questions back to',
-  '  the user.',
+  '- The only exemptions are the three above. File edits and status updates may still end with a card',
+  '  when the reply explains a decision, a comparison or a root cause.',
 ];
 
 export const Config = Schema.object({
