@@ -38,20 +38,6 @@ DSH 自己渲染的 markdown 表格（正文里 `| a | b |` 那种）现在与�
 
 自检：给 `html` 加 `data-folio-mdtable-probe="1"`（浏览器控制台执行 `document.documentElement.dataset.folioMdtableProbe='1'`），表格会出现 1px 虚线描边 → 说明命中；没有描边说明选择器需要更新。
 
-## 卡片展示密度
-
-每张卡右上角有 `详 / 中 / 简` 三档，只裁**已渲染的块**，不改正文、不重发请求：
-
-| 档 | 保留 |
-| --- | --- |
-| 详（默认） | 全部块 |
-| 中 | 去掉 `callout`（注脚类补充） |
-| 简 | 结论（`verdict`）+ 一块内容（表 → 代码 → 要点 → 统计 → 段落，取最先出现的一块），最多两块 |
-
-选择记在 `localStorage`（键 `folio-card-density`），下一张卡沿用。这条纯客户端，与上面的输出深度是两件事：深度决定模型写多少，密度决定你看多少。
-
-没有设置页的原因：DSH 设置页只显示自己注册了设置节的插件，而把值写回宿主配置要经过 `remote.pluginManager` 的 spec 形状——这套 RPC 没有公开文档，实测的报错记录在 [探针结论](docs/plans/2026-11-14_settings-page-probe.md)。
-
 ## 块类型
 
 | 块 | 作用 |

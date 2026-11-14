@@ -87,15 +87,6 @@ window.__ModuleLoader__.load({
   text-wrap: pretty;
 }
 .rc-body { margin-top: 2px; }
-.rc-density { position: absolute; top: 10px; right: 10px; display: flex; gap: 2px; padding: 2px;
-  border-radius: 999px; border: 1px solid var(--dsw-alias-border-l1); opacity: .55;
-  transition: opacity .15s ease; }
-.rc-card:hover .rc-density, .rc-density:focus-within { opacity: 1; }
-.rc-density button { font: inherit; font-size: 11px; line-height: 1; color: var(--dsw-alias-label-secondary);
-  background: none; border: 0; border-radius: 999px; padding: 3px 6px; cursor: pointer; }
-.rc-density button[aria-pressed='true'] { background: color-mix(in oklab, var(--dsw-alias-label-primary) 14%, transparent);
-  color: var(--dsw-alias-label-primary); }
-
 .rc-h {
   position: relative;
   margin: 22px 0 0;
@@ -1289,17 +1280,6 @@ window.__ModuleLoader__.load({
       );
     }
 
-    const DENSITY_KEY = 'folio-card-density';
-
-    function savedDensity() {
-      try {
-        const value = window.localStorage.getItem(DENSITY_KEY);
-        return value === 'mid' || value === 'lean' ? value : 'full';
-      } catch (error) {
-        return 'full';
-      }
-    }
-
     function Card(props) {
       const spec = props.spec;
       const accent = ACCENTS.indexOf(text(spec.accent)) >= 0 ? text(spec.accent) : 'indigo';
@@ -1308,22 +1288,7 @@ window.__ModuleLoader__.load({
       const lead = text(spec.lead);
       const footer = text(spec.footer);
       const blocks = list(spec.blocks).slice(0, 40);
-      const [density, setDensity] = React.useState(savedDensity());
-      // 展示密度只裁剪已渲染的块，不改正文、不重发包。
-      const visible = (() => {
-        if (density === 'full') return blocks;
-        if (density === 'mid') return blocks.filter((block) => text(block && block.type) !== 'callout');
-        // 简：结论 + 一块真正的内容（表 > 代码 > 要点 > 统计 > 段落），最多两块。
-        const CONTENT = ['table', 'code', 'bullets', 'steps', 'stats', 'kv', 'paragraph'];
-        const typeOf = (block) => text(block && block.type);
-        const keep = [];
-        const verdict = blocks.find((block) => typeOf(block) === 'verdict');
-        if (verdict) keep.push(verdict);
-        const content = blocks.find((block) => block !== verdict && CONTENT.indexOf(typeOf(block)) >= 0);
-        if (content) keep.push(content);
-        return keep.length ? keep : blocks.slice(0, 1);
-      })();
-      const body = visible.map((block, index) => renderBlock(block, index)).filter(Boolean);
+      const body = blocks.map((block, index) => renderBlock(block, index)).filter(Boolean);
       const layout = text(spec.layout) === 'article' ? 'article' : 'card';
       const sources = list(spec.sources)
         .map((entry) => text(entry))
@@ -1337,33 +1302,6 @@ window.__ModuleLoader__.load({
           'data-layout': layout,
           'aria-label': title || 'Rich answer card',
         },
-        h(
-          'div',
-          { className: 'rc-density', role: 'group', 'aria-label': '展示深度' },
-          [
-            ['full', '详', '详尽'],
-            ['mid', '中', '适中'],
-            ['lean', '简', '精简'],
-          ].map(([mode, glyph, label]) =>
-            h(
-              'button',
-              {
-                type: 'button',
-                key: mode,
-                title: label,
-                'aria-label': label,
-                'aria-pressed': String(density === mode),
-                onClick: () => {
-                  setDensity(mode);
-                  try {
-                    window.localStorage.setItem(DENSITY_KEY, mode);
-                  } catch (error) {}
-                },
-              },
-              glyph,
-            ),
-          ),
-        ),
         kicker
           ? h(
               'div',
