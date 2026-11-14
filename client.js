@@ -769,6 +769,8 @@ window.__ModuleLoader__.load({
 .rc-mermaid-zoom-hint { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
   font-size: 12px; color: #cfd3da; opacity: .8; }
 .rc-mermaid-note { margin: -6px 0 14px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.rc-mermaid-pending { min-height: 180px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--dsw-alias-label-secondary); border-style: dashed; cursor: progress; }
 .rc-mdtable-probe { margin: -8px 0 16px; padding: 8px 10px; border-radius: 6px; font-size: 11px;
   line-height: 1.5; color: var(--dsw-alias-label-secondary); background: color-mix(in oklab, #fff 4%, transparent);
   white-space: pre-wrap; }
@@ -1503,8 +1505,79 @@ window.__ModuleLoader__.load({
 
     /** 真实结构：div.md-code-block > 横幅 + div[data-code-block-content] > pre。
      *  换掉整个代码块外壳（不是只换 pre），失败则原样保留并在下方加一行说明。 */
+    /** 渲染结果按源码哈希缓存：同一张图第二次出现（含刷新、重渲染）直接注入 SVG，
+     *  跳过 mermaid 的解析与布局——这是出图瞬间卡顿的主要来源。 */
+    const MERMAID_CACHE_PREFIX = 'folio-mermaid-svg:';
+    const MERMAID_MEMO = new Map();
+    let mermaidConfigured = false;
+
+    function hashOf(source) {
+      let h = 2166136261;
+      for (let i = 0; i < source.length; i += 1) {
+        h ^= source.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0).toString(36);
+    }
+
+    function cachedSvg(source) {
+      const key = hashOf(source);
+      if (MERMAID_MEMO.has(key)) return MERMAID_MEMO.get(key);
+      try {
+        const stored = window.localStorage.getItem(MERMAID_CACHE_PREFIX + key);
+        if (stored) {
+          MERMAID_MEMO.set(key, stored);
+          return stored;
+        }
+      } catch (error) {}
+      return null;
+    }
+
+    function rememberSvg(source, svg) {
+      const key = hashOf(source);
+      MERMAID_MEMO.set(key, svg);
+      try {
+        window.localStorage.setItem(MERMAID_CACHE_PREFIX + key, svg);
+      } catch (error) {}
+    }
+
+    /** 配置只做一次；反复 initialize 会让 mermaid 重建内部状态。 */
+    function configureMermaid(mermaid) {
+      if (mermaidConfigured) return;
+      mermaidConfigured = true;
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        securityLevel: 'strict',
+        useMaxWidth: false,
+        themeVariables: { fontSize: '15px', fontFamily: 'system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif' },
+        flowchart: { useMaxWidth: false, curve: 'basis', nodeSpacing: 36, rankSpacing: 56, padding: 10 },
+        sequence: { useMaxWidth: false },
+        class: { useMaxWidth: false },
+        state: { useMaxWidth: false },
+        er: { useMaxWidth: false },
+      });
+    }
+
     function installMermaid() {
       let timer = 0;
+      // 只有滚到视口附近才渲染：历史消息里的图不再一次性抢占主线程。
+      const shown = new WeakSet();
+      const gate = typeof IntersectionObserver === 'function'
+        ? new IntersectionObserver(
+            (entries) => {
+              let touched = false;
+              for (const entry of entries) {
+                if (!entry.isIntersecting) continue;
+                shown.add(entry.target);
+                gate.unobserve(entry.target);
+                touched = true;
+              }
+              if (touched) void upgrade();
+            },
+            { rootMargin: '240px' },
+          )
+        : null;
 
       const upgrade = async () => {
         if (mermaidBusy) return;
@@ -1516,36 +1589,50 @@ window.__ModuleLoader__.load({
         try {
           for (const pre of pres) {
             if (pre.getAttribute(MERMAID_SEEN)) continue;
+            // 缓存命中不需要等可见；其余的先挂观察器，滚到了再渲染。
+            if (gate && !shown.has(pre) && !cachedSvg((pre.textContent || '').trim())) {
+              gate.observe(pre);
+              continue;
+            }
             pre.setAttribute(MERMAID_SEEN, 'pending');
             const shell = (pre.closest && pre.closest('.md-code-block')) || pre;
             const source = (pre.textContent || '').trim();
             if (!source) continue;
-            try {
-              const mermaid = await loadMermaid();
-              // useMaxWidth:false 是不被压扁的关键：mermaid 默认输出 width="100%"，
-              // 大图会被等比缩到卡片宽度，字就小到不可读。关掉它，SVG 保持自然尺寸 + 滚动。
-              mermaid.initialize({
-                startOnLoad: false,
-                theme: 'dark',
-                securityLevel: 'strict',
-                useMaxWidth: false,
-                themeVariables: { fontSize: '15px', fontFamily: 'system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif' },
-                flowchart: { useMaxWidth: false, curve: 'basis', nodeSpacing: 36, rankSpacing: 56, padding: 10 },
-                sequence: { useMaxWidth: false },
-                class: { useMaxWidth: false },
-                state: { useMaxWidth: false },
-                er: { useMaxWidth: false },
-              });
-              const id = 'rc-mermaid-' + Math.random().toString(36).slice(2, 10);
-              const { svg } = await mermaid.render(id, source);
+            const mount = (target, svgText) => {
               const box = document.createElement('div');
               box.className = 'rc-mermaid';
               box.setAttribute(MERMAID_SEEN, 'ok');
               box.setAttribute('role', 'button');
               box.setAttribute('tabindex', '0');
               box.setAttribute('aria-label', 'mermaid 图，点击放大');
-              box.innerHTML = svg;
-              shell.replaceWith(box);
+              box.innerHTML = svgText;
+              target.replaceWith(box);
+              rememberSvg(source, svgText);
+              return box;
+            };
+
+            try {
+              // 缓存命中：只做一次字符串注入，不碰 mermaid，不产生测量/布局抖动。
+              const hit = cachedSvg(source);
+              if (hit) {
+                mount(shell, hit);
+                continue;
+              }
+              // 未命中：先占位（固定最小高度，避免内容跳动），再在空闲帧里渲染。
+              const placeholder = document.createElement('div');
+              placeholder.className = 'rc-mermaid rc-mermaid-pending';
+              placeholder.textContent = '正在绘制图…';
+              shell.replaceWith(placeholder);
+              try {
+                const mermaid = await loadMermaid();
+                configureMermaid(mermaid);
+                const id = 'rc-mermaid-' + Math.random().toString(36).slice(2, 10);
+                const { svg } = await mermaid.render(id, source);
+                mount(placeholder, svg);
+              } catch (inner) {
+                placeholder.replaceWith(shell);
+                throw inner;
+              }
             } catch (error) {
               pre.setAttribute(MERMAID_SEEN, 'failed');
               const note = document.createElement('div');
@@ -1681,13 +1768,21 @@ window.__ModuleLoader__.load({
 
       const schedule = () => {
         clearTimeout(timer);
-        timer = setTimeout(() => void upgrade(), 150);
+        // 先等流结束（160ms 静默），再把渲染排进空闲帧，避免和正文渲染抢主线程。
+        timer = setTimeout(() => {
+          if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(() => void upgrade(), { timeout: 900 });
+          } else {
+            void upgrade();
+          }
+        }, 160);
       };
       schedule();
       const observer = new MutationObserver(schedule);
       observer.observe(document.body, { childList: true, subtree: true, characterData: true });
       return () => {
         clearTimeout(timer);
+        if (gate) gate.disconnect();
         observer.disconnect();
         document.removeEventListener('click', onClick);
         document.removeEventListener('keydown', onEnter);

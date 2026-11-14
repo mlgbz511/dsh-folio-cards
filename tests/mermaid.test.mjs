@@ -64,6 +64,14 @@ assert.ok(client.includes("'wheel'"), 'overlay zooms with the wheel');
 assert.ok(client.includes("'pointerdown'"), 'overlay pans by dragging');
 assert.ok(client.includes('dblclick'), 'double click refits the view');
 assert.ok(client.includes('const fit = () =>'), 'lightbox fits the diagram on open');
+// 性能：结果缓存、占位、可见才渲染、空闲帧调度
+assert.ok(client.includes('function cachedSvg'), 'rendered SVGs are cached by source hash');
+assert.ok(client.includes('function rememberSvg'), 'renders are written back to the cache');
+assert.ok(client.includes("'folio-mermaid-svg:'"), 'cache key is namespaced');
+assert.ok(client.includes('rc-mermaid-pending'), 'a placeholder holds the layout while rendering');
+assert.ok(client.includes('new IntersectionObserver'), 'diagrams render only when near the viewport');
+assert.ok(client.includes('requestIdleCallback'), 'rendering is deferred to an idle frame');
+assert.ok(client.includes('configureMermaid'), 'mermaid is configured once, not per diagram');
 assert.ok(client.includes('vw * 0.92'), 'fit uses the viewport, not the element size');
 assert.ok(client.includes('getBoundingClientRect'), 'wheel zoom reads the live box');
 assert.ok(client.includes('1 - next / scale'), 'wheel zoom compensates the pan so the cursor stays put');
