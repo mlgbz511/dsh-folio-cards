@@ -761,6 +761,9 @@ window.__ModuleLoader__.load({
 .rc-mermaid-zoom-hint { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
   font-size: 12px; color: #cfd3da; opacity: .8; }
 .rc-mermaid-note { margin: -6px 0 14px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.rc-mdtable-probe { margin: -8px 0 16px; padding: 8px 10px; border-radius: 6px; font-size: 11px;
+  line-height: 1.5; color: var(--dsw-alias-label-secondary); background: color-mix(in oklab, #fff 4%, transparent);
+  white-space: pre-wrap; }
 
 `;
 
@@ -1597,6 +1600,46 @@ window.__ModuleLoader__.load({
       };
     }
 
+    /** 探针模式：html[data-folio-mdtable-probe="1"] 时，在每张表后打印真实计算样式。
+     *  只用于排查「表格看起来怪」——给出事实，不再靠截图猜。 */
+    function installMdProbe() {
+      let timer = 0;
+      const dump = () => {
+        if (document.documentElement.getAttribute('data-folio-mdtable-probe') !== '1') return;
+        const wraps = document.querySelectorAll('div[class*="tableScroll"], div[class*="tableFill"]');
+        for (const wrap of wraps) {
+          if (wrap.getAttribute('data-folio-probe')) continue;
+          const table = wrap.querySelector('table');
+          const cell = table && table.querySelector('tbody td');
+          const note = document.createElement('pre');
+          note.className = 'rc-mdtable-probe';
+          const cs = cell ? window.getComputedStyle(cell) : null;
+          const ts = table ? window.getComputedStyle(table) : null;
+          note.textContent = [
+            'wrap=' + String(wrap.className),
+            'table display=' + (ts ? ts.display : '-') + ' table-layout=' + (ts ? ts.tableLayout : '-'),
+            'table width=' + (table ? Math.round(table.getBoundingClientRect().width) : '-'),
+            'cell white-space=' + (cs ? cs.whiteSpace : '-') + ' display=' + (cs ? cs.display : '-'),
+            'cell line-height=' + (cs ? cs.lineHeight : '-') + ' height=' + (cell ? Math.round(cell.getBoundingClientRect().height) : '-'),
+            'cell overflow-wrap=' + (cs ? cs.overflowWrap : '-') + ' word-break=' + (cs ? cs.wordBreak : '-'),
+          ].join(String.fromCharCode(10));
+          wrap.setAttribute('data-folio-probe', '1');
+          wrap.after(note);
+        }
+      };
+      const schedule = () => {
+        clearTimeout(timer);
+        timer = setTimeout(dump, 200);
+      };
+      schedule();
+      const observer = new MutationObserver(schedule);
+      observer.observe(document.body, { childList: true, subtree: true });
+      return () => {
+        clearTimeout(timer);
+        observer.disconnect();
+      };
+    }
+
     function installCardFences() {
       let ReactDOM = null;
       try {
@@ -1766,6 +1809,7 @@ window.__ModuleLoader__.load({
         ctx.effect(() => installCardFences(), 'dsh-folio-cards: card fences');
 
         if (document.body) ctx.effect(() => installMermaid(), 'dsh-folio-cards: mermaid');
+        if (document.body) ctx.effect(() => installMdProbe(), 'dsh-folio-cards: md table probe');
 
         ctx.effect(() =>
           ctx.slots.inject('tool.call.toolview', () =>
