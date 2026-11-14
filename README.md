@@ -34,6 +34,8 @@ DSH 本身不认 `mermaid` 语言（前端包里 mermaid/dagre/flowchart 出现 
 
 机制（**不动 DSH 本体**）：
 
+0. **宿主预渲染（4.0.0 起默认走这条）**：宿主用隐藏的 Electron 窗口加载 `/folio-cards/mermaid.min.js`，在窗口里 `mermaid.render`，把 SVG 字符串回给客户端；客户端只做字符串注入，**主线程不解析、不布局**。宿主按源码哈希做一层内存缓存（≤60 条）。任何一步失败（Electron 不可用、窗口起不来、25s 超时、语法错误）→ 返回 503，客户端自动退回本机渲染。排查入口：`curl /folio-cards/health` 返回 `{ok, electron, renderer, cached}`；
+
 1. 宿主半把 `vendor/mermaid.min.js` 用 `webServer.register` 暴露成 `/folio-cards/mermaid.min.js`；
 2. 客户端半发现有 `pre code.language-mermaid` 时，**首次按需**加载该脚本（同 origin），调用 `mermaid.render` 换成 `div.rc-mermaid > svg`；
 3. 任一环节失败（路由 404、脚本加载失败、语法错误、CSP 拦截）→ 保留原代码块，只打上 `data-folio-mermaid="failed"` 标记，**不影响其它内容**；

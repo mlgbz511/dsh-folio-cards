@@ -1485,6 +1485,23 @@ window.__ModuleLoader__.load({
       return MERMAID_HEAD.test((element.textContent || ''));
     }
 
+    /** 先问宿主：它在隐藏窗口里渲染，主线程零负担。失败返回 null，调用方退回本地渲染。 */
+    async function hostSvg(source) {
+      try {
+        const response = await fetch('/folio-cards/mermaid-render', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ source: source }),
+        });
+        if (!response.ok) return null;
+        const payload = await response.json();
+        const svg = payload && payload.svg;
+        return typeof svg === 'string' && svg.indexOf('<svg') >= 0 ? svg : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
     function loadMermaid() {
       if (window.mermaid) return Promise.resolve(window.mermaid);
       if (mermaidPending) return mermaidPending;
@@ -1623,6 +1640,12 @@ window.__ModuleLoader__.load({
               placeholder.className = 'rc-mermaid rc-mermaid-pending';
               placeholder.textContent = '正在绘制图…';
               shell.replaceWith(placeholder);
+              // 宿主优先：它渲染不占主线程；拿不到（服务未起/窗口起不来/超时）再本地渲染。
+              const hosted = await hostSvg(source);
+              if (hosted) {
+                mount(placeholder, hosted);
+                continue;
+              }
               try {
                 const mermaid = await loadMermaid();
                 configureMermaid(mermaid);

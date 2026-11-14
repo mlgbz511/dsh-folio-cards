@@ -25,7 +25,16 @@ assert.ok(fs.existsSync(path.join(repo, 'vendor', 'mermaid.LICENSE')), 'license 
 let route = null;
 const ctx = {
   effect: (fn) => { const out = fn(); return typeof out === 'function' ? out : () => {}; },
-  inject: (deps, fn) => { fn({ webServer: { register: (spec) => { route = spec; return () => {}; } } }); },
+  inject: (deps, fn) => {
+    fn({
+      webServer: {
+        register: (spec) => {
+          if (spec.path === '/folio-cards/mermaid.min.js') route = spec;
+          return () => {};
+        },
+      },
+    });
+  },
   systemPrompt: { section: () => () => {} },
   tools: { register: () => () => {} },
 };
@@ -39,6 +48,25 @@ route.handler({}, res);
 assert.equal(res.code, 200, 'route answers 200');
 assert.ok(String(res.headers['content-type']).includes('javascript'), 'served as javascript');
 assert.ok(res.body && res.body.length > 1000000, 'route serves the whole bundle');
+
+// 2b) 宿主预渲染路由 + 健康检查
+const routes = [];
+const ctx2 = {
+  effect: (fn) => { const out = fn(); return typeof out === 'function' ? out : () => {}; },
+  inject: (deps, fn) => { fn({ webServer: { register: (spec) => { routes.push(spec); return () => {}; } } }); },
+  systemPrompt: { section: () => () => {} },
+  tools: { register: () => () => {} },
+};
+mod.apply(ctx2);
+const paths = routes.map((entry) => entry.path);
+assert.ok(paths.includes('/folio-cards/mermaid-render'), 'host render route registered');
+assert.ok(paths.includes('/folio-cards/health'), 'health route registered');
+const healthRes = { code: 0, headers: null, body: null, headersSent: false, writeHead(code, headers) { this.code = code; this.headers = headers; }, end(body) { this.body = body; } };
+routes.find((entry) => entry.path === '/folio-cards/health').handler({ headers: { host: '127.0.0.1:1' } }, healthRes);
+assert.equal(healthRes.code, 200, 'health answers 200');
+const health = JSON.parse(String(healthRes.body));
+assert.equal(health.ok, true, 'health reports ok');
+assert.ok('electron' in health && 'renderer' in health, 'health reports renderer facts');
 
 // 3) 客户端：只接管 mermaid 围栏，失败必须保留原代码块
 const client = fs.readFileSync(path.join(repo, 'client.js'), 'utf8');
@@ -66,6 +94,10 @@ assert.ok(client.includes('dblclick'), 'double click refits the view');
 assert.ok(client.includes('const fit = () =>'), 'lightbox fits the diagram on open');
 // 性能：结果缓存、占位、可见才渲染、空闲帧调度
 assert.ok(client.includes('function cachedSvg'), 'rendered SVGs are cached by source hash');
+assert.ok(client.includes('async function hostSvg'), 'client asks the host to pre-render');
+assert.ok(client.includes("'/folio-cards/mermaid-render'"), 'client posts to the host render route');
+assert.ok(client.includes('const hosted = await hostSvg(source)'), 'host result is mounted directly');
+assert.ok(client.includes('const mermaid = await loadMermaid()'), 'local renderer kept as the fallback');
 assert.ok(client.includes('function rememberSvg'), 'renders are written back to the cache');
 assert.ok(client.includes("'folio-mermaid-svg:'"), 'cache key is namespaced');
 assert.ok(client.includes('rc-mermaid-pending'), 'a placeholder holds the layout while rendering');

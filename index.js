@@ -9,6 +9,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import Schema from '@deepseek-ai/schemastery';
 
@@ -321,6 +322,155 @@ export const inject = ['tools', 'systemPrompt'];
 /** 客户端要用的 mermaid UMD 包（vendor/，MIT）。缺文件时路由挂不上，客户端会自动退回代码块。 */
 const MERMAID_FILE = join(dirname(fileURLToPath(import.meta.url)), 'vendor', 'mermaid.min.js');
 
+/* 宿主侧预渲染：隐藏的 Electron 窗口里跑 mermaid，把 SVG 字符串交给客户端。
+   客户端因此不参与解析/布局（出图不再卡主线程）；任何一步失败都返回错误，
+   客户端自动退回自己的本地渲染，功能不会因此消失。 */
+const RENDER_PATH = '/folio-cards/mermaid-render';
+const HEALTH_PATH = '/folio-cards/health';
+const RENDER_TIMEOUT_MS = 25000;
+
+const HOST_PAGE = [
+  '<!doctype html><meta charset="utf-8">',
+  '<script src="__ORIGIN__/folio-cards/mermaid.min.js"></script>',
+  '<script>',
+  'window.__renderMermaid = async function (source) {',
+  '  try {',
+  '    var m = window.mermaid;',
+  '    if (!m) return { error: "mermaid missing" };',
+  '    if (!window.__configured) {',
+  '      window.__configured = true;',
+  '      m.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict", useMaxWidth: false,',
+  '        themeVariables: { fontSize: "15px", fontFamily: "system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif" },',
+  '        flowchart: { useMaxWidth: false, curve: "basis", nodeSpacing: 36, rankSpacing: 56, padding: 10 },',
+  '        sequence: { useMaxWidth: false }, class: { useMaxWidth: false }, state: { useMaxWidth: false }, er: { useMaxWidth: false } });',
+  '    }',
+  '    var id = "h" + Math.random().toString(36).slice(2, 9);',
+  '    var out = await m.render(id, source);',
+  '    return { svg: out.svg };',
+  '  } catch (error) { return { error: String((error && error.message) || error) }; }',
+  '};',
+  '</script>',
+].join(String.fromCharCode(10));
+
+const hostCache = new Map();
+let rendererWindow = null;
+let rendererPending = null;
+
+function electronModule() {
+  try {
+    return createRequire(import.meta.url)('electron');
+  } catch (error) {
+    return null;
+  }
+}
+
+function cacheKey(source) {
+  let h = 2166136261;
+  for (let i = 0; i < source.length; i += 1) {
+    h ^= source.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36) + '-' + source.length;
+}
+
+function acquireRenderer(origin) {
+  if (rendererWindow && !rendererWindow.isDestroyed()) return Promise.resolve(rendererWindow);
+  if (rendererPending) return rendererPending;
+  rendererPending = new Promise((resolve, reject) => {
+    const electron = electronModule();
+    const BrowserWindow = electron && electron.BrowserWindow;
+    if (typeof BrowserWindow !== 'function') {
+      reject(new Error('electron BrowserWindow unavailable'));
+      return;
+    }
+    const page = HOST_PAGE.split('__ORIGIN__').join(origin);
+    const win = new BrowserWindow({
+      show: false,
+      width: 1000,
+      height: 760,
+      webPreferences: {
+        sandbox: true,
+        contextIsolation: true,
+        backgroundThrottling: false,
+        offscreen: true,
+      },
+    });
+    try {
+      if (win.webContents.setAudioMuted) win.webContents.setAudioMuted(true);
+    } catch (error) {}
+    win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(page)).then(
+      () => {
+        rendererWindow = win;
+        win.on('closed', () => {
+          if (rendererWindow === win) rendererWindow = null;
+        });
+        resolve(win);
+      },
+      (error) => reject(error),
+    );
+  });
+  rendererPending.catch(() => {
+    rendererPending = null;
+  });
+  return rendererPending;
+}
+
+async function renderOnHost(source, origin) {
+  const key = cacheKey(source);
+  const hit = hostCache.get(key);
+  if (hit) return hit;
+  const win = await acquireRenderer(origin);
+  const call =
+    'window.__renderMermaid(' + JSON.stringify(source) + ')';
+  const timed = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('render timeout')), RENDER_TIMEOUT_MS);
+    win.webContents.executeJavaScript(call, true).then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+  const result = await timed;
+  if (!result || result.error) throw new Error((result && result.error) || 'render failed');
+  if (hostCache.size > 60) hostCache.clear();
+  hostCache.set(key, result.svg);
+  return result.svg;
+}
+
+function readJsonBody(req, limit) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        reject(new Error('payload too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch (error) {
+        reject(new Error('invalid json'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+function sendJson(res, status, payload) {
+  if (!res.headersSent) res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(payload));
+}
+
 export function apply(ctx) {
   if (REGISTER_TOOL) ctx.effect(
     () =>
@@ -361,6 +511,55 @@ export function apply(ctx) {
         },
       });
     }, 'dsh-folio-cards: mermaid asset');
+
+    // 健康检查：确认宿主渲染器可用（不给客户端用，方便 curl 排查）。
+    ctx.effect(
+      () =>
+        webCtx.webServer.register({
+          kind: 'exact',
+          path: HEALTH_PATH,
+          handler(req, res) {
+            const electron = electronModule();
+            sendJson(res, 200, {
+              ok: true,
+              electron: Boolean(electron && electron.BrowserWindow),
+              renderer: Boolean(rendererWindow && !rendererWindow.isDestroyed()),
+              cached: hostCache.size,
+            });
+          },
+        }),
+      'dsh-folio-cards: health',
+    );
+
+    // 预渲染：POST { source } → { svg } 或 { error }。客户端拿不到就自己渲染。
+    ctx.effect(
+      () =>
+        webCtx.webServer.register({
+          kind: 'exact',
+          path: RENDER_PATH,
+          handler(req, res) {
+            const origin = 'http://' + String((req.headers && req.headers.host) || '127.0.0.1');
+            readJsonBody(req, 512 * 1024).then(
+              async (payload) => {
+                const source = payload && typeof payload.source === 'string' ? payload.source : '';
+                if (!source.trim()) {
+                  sendJson(res, 400, { error: 'source required' });
+                  return;
+                }
+                try {
+                  const svg = await renderOnHost(source, origin);
+                  sendJson(res, 200, { svg });
+                } catch (error) {
+                  sendJson(res, 503, { error: String((error && error.message) || error) });
+                }
+              },
+              (error) => sendJson(res, 400, { error: String((error && error.message) || error) }),
+            );
+          },
+        }),
+      'dsh-folio-cards: mermaid render',
+    );
+
   });
 
   ctx.effect(
