@@ -31,6 +31,11 @@ assert.ok(code.includes("class*='tableFill'"), 'targets tableFill wrapper');
 // 外框必须画在包裹层上（画在 table 上会被滚动容器裁掉边角）
 assert.ok(/:where\(div\[class\*='tableScroll'\][^{]*\{[^}]*border: 1px solid/.test(code), 'wrapper carries the outer border');
 assert.ok(code.includes('border-top-left-radius'), 'corner cells are rounded');
+// 首列不许再强制单行/最小宽度：那样会把长内容挤出行盒，出现文字重叠
+const firstCol = /th:first-child, table:not\(\.rc-table\) td:first-child\) \{([\s\S]*?)\}/.exec(code);
+assert.ok(firstCol, 'first-column rule present');
+assert.ok(!/white-space:\s*nowrap/.test(firstCol[1]), 'first column wraps again');
+assert.ok(!/min-width:\s*(?!0\b)[0-9]/.test(firstCol[1]), 'first column has no forced min-width');
 assert.ok(!/table:not\(\.rc-table\)\) \{[^}]*border-radius: 6px/.test(code), 'table itself no longer carries a radius');
 // 这两类选择器在本构建里不存在（会静默失效），禁止再用
 assert.ok(!code.includes('[data-markdown]'), 'drops the non-existent [data-markdown]');

@@ -666,6 +666,8 @@ window.__ModuleLoader__.load({
   padding: 8px 12px;
   text-align: left;
   vertical-align: top;
+  white-space: normal;
+  word-break: normal;
   overflow-wrap: break-word;
   border-right: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
   border-bottom: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
@@ -687,10 +689,11 @@ window.__ModuleLoader__.load({
   white-space: nowrap;
 }
 /* 首列是行的主轴，不换行；悬停只做极轻底。 */
+/* 首列只加粗，不强制单行：nowrap + min-width 会把长内容挤出行盒，造成上下两行重叠。 */
 :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) th:first-child, table:not(.rc-table) td:first-child) {
   font-weight: 500;
-  white-space: nowrap;
-  min-width: 4.5em;
+  white-space: normal;
+  min-width: 0;
 }
 :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) tbody tr:hover td) {
   background: color-mix(in oklab, var(--dsw-alias-label-primary) 4%, transparent);
