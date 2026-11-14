@@ -630,6 +630,109 @@ window.__ModuleLoader__.load({
   .rc-card { animation: none; }
   .rc-skel-line { animation: none; }
 }
+
+/* ── markdown 表格皮肤：插件层，零优先级，可整体删除 ────────────────
+   目标：正文里的原生 markdown 表格（| a | b |）与卡片内表格同观感。
+   约束：所有选择器都用 :where() 包裹（零优先级）、无 !important，
+   因此 DSH 自带样式永远优先；只命中 markdown 容器内的 table，
+   并排除卡片自身的 .rc-table（由卡片样式负责）。
+   探针：<html data-folio-mdtable-probe="1"> 时给表格加 1px 虚线描边，
+   默认关闭，只用于确认选择器是否命中。
+   回退：删掉本段即恢复原生表格，无其它副作用。 */
+/* 容器用查证过的 CSS Module 局部名（class 属性子串匹配，哈希段随构建变化不可硬编码）；
+   表格自身无类名，所以只能靠父 div 后代选择器命中。 */
+:where(div[class*='tableScroll'], div[class*='tableFill']) > :where(table:not(.rc-table)) {
+  margin: 14px 0 8px;
+  border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
+  border-radius: 6px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+/* 低对比网格：右边线 + 下边线，末列末行收边，避免双线。 */
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) th, table:not(.rc-table) td) {
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: break-word;
+  border-right: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
+}
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) th:last-child, table:not(.rc-table) td:last-child) {
+  border-right: 0;
+}
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) tbody tr:last-child td) {
+  border-bottom: 0;
+}
+/* 表头稍亮：弱底 + 次级文字色，字号比正文小一档。 */
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) thead th) {
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 4%, var(--dsw-alias-bg-layer-1));
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* 首列是行的主轴，不换行；悬停只做极轻底。 */
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) th:first-child, table:not(.rc-table) td:first-child) {
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 4.5em;
+}
+:where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) tbody tr:hover td) {
+  background: color-mix(in oklab, var(--dsw-alias-label-primary) 4%, transparent);
+}
+/* 探针开关：默认关闭，仅调试时验证命中。 */
+:where(html[data-folio-mdtable-probe='1']) :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table)) {
+  outline: 1px dashed var(--dsw-alias-state-warning-primary);
+  outline-offset: -1px;
+}
+/* 窄屏折叠：表头隐藏，每行变块，单元格用 data-label 伪元素标列。
+   原生 markdown 表格的单元格没有 data-label，标签自然不出现，不会留空槽。 */
+@media (max-width: 640px) {
+  :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table)) {
+    width: 100%;
+    overflow-x: auto;
+  }
+  :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) thead) {
+    display: none;
+  }
+  :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table), table:not(.rc-table) tbody, table:not(.rc-table) tr, table:not(.rc-table) td) {
+    display: block;
+    width: auto;
+  }
+  :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) tr) {
+    border-bottom: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 45%, transparent);
+  }
+  :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) tbody tr:last-child) {
+    border-bottom: 0;
+  }
+  :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) td) {
+    padding: 6px 12px;
+    border-right: 0;
+    border-bottom: 0;
+  }
+  :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) td:first-child) {
+    padding-top: 9px;
+    font-weight: 500;
+    white-space: normal;
+  }
+  :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) td)::before {
+    content: attr(data-label);
+    display: inline;
+    margin-right: 0.6em;
+    color: var(--dsw-alias-label-secondary);
+    font-size: 11.5px;
+    font-weight: 400;
+  }
+  :where(div[class*='tableScroll'], div[class*='tableFill']) :where(table:not(.rc-table) td:not([data-label]))::before {
+    content: none;
+  }
+}
 `;
 
     function text(value) {

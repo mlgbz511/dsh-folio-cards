@@ -24,6 +24,20 @@ dsh plugin --profile <你的 profile> add link:<本仓库绝对路径>
 
 想恢复四档（`1/2/3/0` + `/depth` 命令 + patch 热重载）：回退到 `2.7.1`，或看该版本提交 `beb38e1`/`2406ad1` 的实现。
 
+## 正文表格皮肤
+
+DSH 自己渲染的 markdown 表格（正文里 `| a | b |` 那种）现在与卡片里的表格同一套观感：低对比网格、表头次级色、首列不折、窄屏折成堆叠。
+
+三条安全约束：
+
+- **只在插件层**：注入一段 `<style data-dsh-folio-cards>`，不改 app.asar、不劫持渲染器、不打 DOM 补丁；
+- **零优先级**：选择器全部 `:where()` 包裹，DSH 自带样式永远优先；新皮肤段内 0 个 `!important`；
+- **可整体删除**：删掉样式表里标记为 markdown-table skin 的那一段即回退。
+
+命中依据（查证过）：表格自身没有类名，靠父容器 `div[class*='tableScroll']` / `div[class*='tableFill']` 后代选择器命中；`.markdown`、`[data-markdown]`、`.markdown-table` 在这个构建里都不存在。
+
+自检：给 `html` 加 `data-folio-mdtable-probe="1"`（浏览器控制台执行 `document.documentElement.dataset.folioMdtableProbe='1'`），表格会出现 1px 虚线描边 → 说明命中；没有描边说明选择器需要更新。
+
 ## 卡片展示密度
 
 每张卡右上角有 `详 / 中 / 简` 三档，只裁**已渲染的块**，不改正文、不重发请求：
