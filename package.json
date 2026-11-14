@@ -1,6 +1,6 @@
 {
   "name": "dsh-folio-cards",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "private": true,
   "type": "module",
   "description": "Typographic answer cards for the DSH Web conversation: fifteen blocks, a low-contrast grid table, and four switchable output depths.",

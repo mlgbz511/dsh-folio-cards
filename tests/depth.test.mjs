@@ -19,7 +19,12 @@ const capture = (config) => {
   let commandRegistrations = 0;
   mod.apply({
     effect: (fn) => { const out = fn(); return typeof out === 'function' ? out : () => {}; },
-    inject: (deps, fn) => { fn({ commands: { register: () => { commandRegistrations += 1; return () => {}; } } }); },
+    inject: (deps, fn) => {
+      fn({
+        commands: { register: () => { commandRegistrations += 1; return () => {}; } },
+        webServer: { register: () => () => {} },
+      });
+    },
     systemPrompt: { section: (spec) => { sections.push(spec); return () => {}; } },
     tools: { register: () => () => {} },
   }, config);
