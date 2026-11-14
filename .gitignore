@@ -1,3 +1,8 @@
+# vendor/ 是运行时必需（mermaid UMD + license）。全局 gitignore（git-vault）排除了 vendor/，
+# 这里在仓库内反排除，保证克隆即有文件、离线可用。
+!vendor/
+!vendor/**
+
 node_modules/
 *.log
 _patch*.py
