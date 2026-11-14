@@ -39,6 +39,18 @@ dsh plugin --profile <你的 profile> add link:<本仓库绝对路径>
 
 **保存文件即生效**：宿主会监听这个 patch，约半秒内重挂提示词区段，不用重启 App（这条有测试覆盖：`tests/watch.test.mjs`）。非法值一律回落 `verbose`，不会让插件加载失败。
 
+## 卡片展示密度
+
+每张卡右上角有 `详 / 中 / 简` 三档，只裁**已渲染的块**，不改正文、不重发请求：
+
+| 档 | 保留 |
+| --- | --- |
+| 详（默认） | 全部块 |
+| 中 | 去掉 `callout`（注脚类补充） |
+| 简 | 只留 `verdict`，没有 verdict 时留第一个块 |
+
+选择记在 `localStorage`（键 `folio-card-density`），下一张卡沿用。这条纯客户端，与上面的输出深度是两件事：深度决定模型写多少，密度决定你看多少。
+
 没有设置页的原因：DSH 设置页只显示自己注册了设置节的插件，而把值写回宿主配置要经过 `remote.pluginManager` 的 spec 形状——这套 RPC 没有公开文档，实测的报错记录在 [探针结论](docs/plans/2026-11-14_settings-page-probe.md)。
 
 ## 块类型
