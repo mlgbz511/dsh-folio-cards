@@ -340,7 +340,7 @@ const HOST_PAGE = [
   '    if (!window.__configured) {',
   '      window.__configured = true;',
   '      m.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict", useMaxWidth: false,',
-  '        themeVariables: { fontSize: "15px", fontFamily: "system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif" },',
+  '        themeVariables: { fontSize: "16px", fontFamily: "system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif" },',
   '        flowchart: { useMaxWidth: false, curve: "basis", nodeSpacing: 36, rankSpacing: 56, padding: 10 },',
   '        sequence: { useMaxWidth: false }, class: { useMaxWidth: false }, state: { useMaxWidth: false }, er: { useMaxWidth: false } });',
   '    }',

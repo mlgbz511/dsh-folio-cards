@@ -1567,7 +1567,7 @@ window.__ModuleLoader__.load({
         theme: 'dark',
         securityLevel: 'strict',
         useMaxWidth: false,
-        themeVariables: { fontSize: '15px', fontFamily: 'system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif' },
+        themeVariables: { fontSize: '16px', fontFamily: 'system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif' },
         flowchart: { useMaxWidth: false, curve: 'basis', nodeSpacing: 36, rankSpacing: 56, padding: 10 },
         sequence: { useMaxWidth: false },
         class: { useMaxWidth: false },
@@ -1686,7 +1686,7 @@ window.__ModuleLoader__.load({
         box.className = 'rc-mermaid-zoom';
         const hint = document.createElement('div');
         hint.className = 'rc-mermaid-zoom-hint';
-        hint.textContent = '滚轮缩放 · 拖拽平移 · 双击复位 · 点背景或 Esc 关闭';
+        hint.textContent = '滚轮缩放 · 拖拽平移 · 双击切整图/1:1 · 点背景或 Esc 关闭';
         const svg = source.cloneNode(true);
         svg.removeAttribute('style');
         svg.style.transformOrigin = '0 0';
@@ -1707,9 +1707,21 @@ window.__ModuleLoader__.load({
           if (!r.width || !r.height) return;
           const vw = window.innerWidth;
           const vh = window.innerHeight;
-          scale = Math.min(1, (vw * 0.92) / r.width, (vh * 0.86) / r.height);
+          const fitScale = Math.min((vw * 0.92) / r.width, (vh * 0.86) / r.height);
+          // 可读性下限：低于 0.85 就保持 0.85 并允许拖拽，宁可溢出也别给一张糊图。
+          scale = Math.min(1, Math.max(0.85, fitScale));
           tx = (vw - r.width * scale) / 2 - r.left;
           ty = (vh - r.height * scale) / 2 - r.top;
+          sync();
+        };
+
+        // 双击在「整图适配」和「1:1 原始尺寸」之间切换。
+        const centerAt = (next) => {
+          svg.style.transform = 'none';
+          const rect = svg.getBoundingClientRect();
+          scale = next;
+          tx = (window.innerWidth - rect.width * next) / 2 - rect.left;
+          ty = (window.innerHeight - rect.height * next) / 2 - rect.top;
           sync();
         };
         // 以光标位置为锚点缩放：光标下的那个点缩放前后保持不动。
@@ -1751,7 +1763,8 @@ window.__ModuleLoader__.load({
         let fitted = false;
         svg.addEventListener('dblclick', (event) => {
           event.stopPropagation();
-          fit();
+          if (scale > 0.999) fit();
+          else centerAt(1);
         });
         // 首帧后再适配：此刻 SVG 已挂到文档里，量到的才是真实尺寸。
         requestAnimationFrame(() => {

@@ -105,6 +105,9 @@ assert.ok(client.includes('new IntersectionObserver'), 'diagrams render only whe
 assert.ok(client.includes('requestIdleCallback'), 'rendering is deferred to an idle frame');
 assert.ok(client.includes('configureMermaid'), 'mermaid is configured once, not per diagram');
 assert.ok(client.includes('vw * 0.92'), 'fit uses the viewport, not the element size');
+assert.ok(client.includes('Math.max(0.85, fitScale)'), 'the opened view never shrinks below a legible floor');
+assert.ok(client.includes('const centerAt = (next)'), 'double click can switch to 1:1');
+assert.ok(client.includes("fontSize: '16px'"), 'labels are 16px');
 assert.ok(client.includes('getBoundingClientRect'), 'wheel zoom reads the live box');
 assert.ok(client.includes('1 - next / scale'), 'wheel zoom compensates the pan so the cursor stays put');
 assert.ok(client.includes("transformOrigin = '0 0'"), 'transform origin is top-left for cursor-anchored zoom');
