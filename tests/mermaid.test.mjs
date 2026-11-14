@@ -63,6 +63,9 @@ assert.ok(client.includes('fontSize'), 'theme sets a readable font size');
 assert.ok(client.includes("'wheel'"), 'overlay zooms with the wheel');
 assert.ok(client.includes("'pointerdown'"), 'overlay pans by dragging');
 assert.ok(client.includes('dblclick'), 'double click resets the view');
+assert.ok(client.includes('getBoundingClientRect'), 'wheel zoom reads the live box');
+assert.ok(client.includes('1 - next / scale'), 'wheel zoom compensates the pan so the cursor stays put');
+assert.ok(client.includes("transformOrigin = '0 0'"), 'transform origin is top-left for cursor-anchored zoom');
 assert.ok(!client.includes('max-width: 100%; height: auto; display: block'), 'inline svg is no longer squeezed');
 
 

@@ -764,7 +764,7 @@ window.__ModuleLoader__.load({
   justify-content: center; padding: 3vmin; background: color-mix(in oklab, #000 88%, transparent);
   cursor: zoom-out; }
 .rc-mermaid-zoom svg { max-width: none; height: auto; filter: drop-shadow(0 8px 40px rgba(0,0,0,.5));
-  transform-origin: center center; will-change: transform; touch-action: none; cursor: grab; }
+  transform-origin: 0 0; will-change: transform; touch-action: none; cursor: grab; }
 .rc-mermaid-zoom svg[data-dragging='1'] { cursor: grabbing; }
 .rc-mermaid-zoom-hint { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
   font-size: 12px; color: #cfd3da; opacity: .8; }
@@ -1579,7 +1579,8 @@ window.__ModuleLoader__.load({
         hint.textContent = '滚轮缩放 · 拖拽平移 · 双击复位 · 点背景或 Esc 关闭';
         const svg = source.cloneNode(true);
         svg.removeAttribute('style');
-        svg.style.transform = 'scale(1)';
+        svg.style.transformOrigin = '0 0';
+        svg.style.transform = 'translate(0px, 0px) scale(1)';
 
         // 滚轮缩放 + 拖拽平移：大图放大后仍能移动到想看的位置。
         let scale = 1;
@@ -1588,11 +1589,20 @@ window.__ModuleLoader__.load({
         const sync = () => {
           svg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
         };
+        // 以光标位置为锚点缩放：光标下的那个点缩放前后保持不动。
         box.addEventListener(
           'wheel',
           (event) => {
             event.preventDefault();
-            scale = Math.min(6, Math.max(0.6, scale * (event.deltaY < 0 ? 1.12 : 0.89)));
+            const rect = svg.getBoundingClientRect();
+            const next = Math.min(6, Math.max(0.6, scale * (event.deltaY < 0 ? 1.12 : 0.89)));
+            if (next === scale) return;
+            const ox = event.clientX - rect.left;
+            const oy = event.clientY - rect.top;
+            // 变换以 (0,0) 为原点：保持光标处局部坐标不变 → 按比例补偿平移
+            tx = tx + ox * (1 - next / scale);
+            ty = ty + oy * (1 - next / scale);
+            scale = next;
             sync();
           },
           { passive: false },
