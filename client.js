@@ -760,11 +760,17 @@ window.__ModuleLoader__.load({
 .rc-mermaid svg { width: 100%; height: auto; max-width: 100%; display: block; }
 .rc-mermaid { cursor: zoom-in; }
 .rc-mermaid:focus-visible { outline: 2px solid var(--dsw-alias-state-warning-primary); outline-offset: 2px; }
-.rc-mermaid-zoom { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center;
-  justify-content: center; padding: 3vmin; background: color-mix(in oklab, #000 88%, transparent);
-  cursor: zoom-out; }
-.rc-mermaid-zoom svg { max-width: none; height: auto; filter: drop-shadow(0 8px 40px rgba(0,0,0,.5));
-  transform-origin: 0 0; will-change: transform; touch-action: none; cursor: grab; }
+/* 顶部留出窗口标题栏（原生 X 按钮在那一层，遮住它会误触关窗口）。 */
+.rc-mermaid-zoom { position: fixed; inset: 34px 6px 6px 6px; z-index: 2147483000;
+  display: flex; align-items: center; justify-content: center; padding: 2vmin;
+  background: color-mix(in oklab, #000 88%, transparent); border-radius: 10px; cursor: zoom-out; }
+/* 不要给 SVG 加 filter：filter 会强制把图层栅格化，再缩放就是糊的（矢量变位图）。 */
+.rc-mermaid-zoom svg { max-width: none; height: auto; transform-origin: 0 0;
+  will-change: transform; touch-action: none; cursor: grab; }
+.rc-mermaid-zoom-close { position: absolute; top: 10px; right: 12px; width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center; border-radius: 6px; border: 0; cursor: pointer;
+  font-size: 16px; line-height: 1; color: #e6e8ee; background: color-mix(in oklab, #fff 10%, transparent); }
+.rc-mermaid-zoom-close:hover { background: color-mix(in oklab, #fff 18%, transparent); }
 .rc-mermaid-zoom svg[data-dragging='1'] { cursor: grabbing; }
 .rc-mermaid-zoom-hint { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
   font-size: 12px; color: #cfd3da; opacity: .8; }
@@ -1773,10 +1779,22 @@ window.__ModuleLoader__.load({
           fit();
         });
 
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'rc-mermaid-zoom-close';
+        closeButton.setAttribute('aria-label', '关闭');
+        closeButton.textContent = '×';
+        closeButton.addEventListener('click', (event) => {
+          event.stopPropagation();
+          closeZoom();
+        });
+
         box.appendChild(svg);
         box.appendChild(hint);
+        box.appendChild(closeButton);
         box.addEventListener('click', (event) => {
           if (event.target === svg || (event.target && event.target.closest && event.target.closest('svg'))) return;
+          if (event.target === closeButton) return;
           closeZoom();
         });
         document.body.appendChild(box);

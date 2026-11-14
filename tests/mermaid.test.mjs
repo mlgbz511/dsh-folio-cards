@@ -107,6 +107,10 @@ assert.ok(client.includes('configureMermaid'), 'mermaid is configured once, not 
 assert.ok(client.includes('vw * 0.92'), 'fit uses the viewport, not the element size');
 assert.ok(client.includes('Math.max(0.85, fitScale)'), 'the opened view never shrinks below a legible floor');
 assert.ok(client.includes('const centerAt = (next)'), 'double click can switch to 1:1');
+// 模糊与误触的两条回归：SVG 上不许有 filter；遮罩必须给标题栏让位并有自己的关闭按钮
+assert.ok(!/\.rc-mermaid-zoom svg \{[^}]*filter:/.test(client), 'no CSS filter on the zoomed svg (it rasterises and blurs)');
+assert.ok(client.includes('inset: 34px 6px 6px 6px'), 'overlay keeps clear of the window chrome');
+assert.ok(client.includes('rc-mermaid-zoom-close'), 'overlay has its own close button');
 assert.ok(client.includes("fontSize: '16px'"), 'labels are 16px');
 assert.ok(client.includes('getBoundingClientRect'), 'wheel zoom reads the live box');
 assert.ok(client.includes('1 - next / scale'), 'wheel zoom compensates the pan so the cursor stays put');
