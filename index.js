@@ -316,8 +316,6 @@ function presentCall(args) {
 
 export const inject = ['tools', 'systemPrompt'];
 
-/** 正文表格皮肤的开关（放在客户端侧；这里只留一条记录，方便回滚时对照版本）。 */
-
 /** 客户端要用的 mermaid UMD 包（vendor/，MIT）。缺文件时路由挂不上，客户端会自动退回代码块。 */
 const MERMAID_FILE = join(dirname(fileURLToPath(import.meta.url)), 'vendor', 'mermaid.min.js');
 
