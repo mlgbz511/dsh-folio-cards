@@ -114,6 +114,10 @@ assert.ok(client.includes('rc-mermaid-zoom-close'), 'overlay has its own close b
 // 合成层栅格化是第二个模糊源：缩放元素上不许出现 will-change
 assert.ok(!/\.rc-mermaid-zoom svg \{[^}]*will-change:/.test(client), 'no will-change on the scaled svg');
 assert.ok(client.includes('rc-mermaid-zoom-tools'), 'overlay exposes zoom buttons');
+// 拖拽作用域是整个遮罩；点空白不再关闭
+assert.ok(client.includes("box.addEventListener('pointerdown'"), 'the whole overlay can be dragged');
+assert.ok(!/box\.addEventListener\('click',[\s\S]{0,200}closeZoom\(\)/.test(client), 'a background click no longer closes it');
+assert.ok(client.includes('user-select: none'), 'dragging does not select text');
 assert.ok(client.includes("fontSize: '18px'"), 'labels are 18px');
 assert.ok(/fontSize: '(1[6-9]|[2-9][0-9])px'/.test(client), 'labels are at least 16px');
 assert.ok(client.includes('getBoundingClientRect'), 'wheel zoom reads the live box');

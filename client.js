@@ -763,7 +763,9 @@ window.__ModuleLoader__.load({
 /* 顶部留出窗口标题栏（原生 X 按钮在那一层，遮住它会误触关窗口）。 */
 .rc-mermaid-zoom { position: fixed; inset: 34px 6px 6px 6px; z-index: 2147483000;
   display: flex; align-items: center; justify-content: center; padding: 2vmin;
-  background: color-mix(in oklab, #000 88%, transparent); border-radius: 10px; cursor: zoom-out; }
+  background: color-mix(in oklab, #000 88%, transparent); border-radius: 10px;
+  cursor: grab; user-select: none; }
+.rc-mermaid-zoom[data-dragging='1'] { cursor: grabbing; }
 /* 两件都会把矢量变成位图、缩放后必糊：filter，以及 will-change: transform
    （后者把元素提升为合成层，按 layout 尺寸栅格化一次，之后是 GPU 缩放那张位图）。
    所以这里只开 transform，不加 will-change。 */
@@ -779,7 +781,6 @@ window.__ModuleLoader__.load({
   cursor: pointer; font-size: 12px; line-height: 1; color: #e6e8ee;
   background: color-mix(in oklab, #fff 10%, transparent); }
 .rc-mermaid-zoom-tools button:hover { background: color-mix(in oklab, #fff 18%, transparent); }
-.rc-mermaid-zoom svg[data-dragging='1'] { cursor: grabbing; }
 .rc-mermaid-zoom-hint { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
   font-size: 12px; color: #cfd3da; opacity: .8; }
 .rc-mermaid-note { margin: -6px 0 14px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
@@ -1700,7 +1701,7 @@ window.__ModuleLoader__.load({
         box.className = 'rc-mermaid-zoom';
         const hint = document.createElement('div');
         hint.className = 'rc-mermaid-zoom-hint';
-        hint.textContent = '滚轮缩放 · 拖拽平移 · 双击切整图/1:1 · 点背景或 Esc 关闭';
+        hint.textContent = '滚轮缩放 · 拖拽平移（遮罩任意处） · 双击切整图/1:1 · × 或 Esc 关闭';
         const svg = source.cloneNode(true);
         svg.removeAttribute('style');
         svg.style.transformOrigin = '0 0';
@@ -1770,13 +1771,15 @@ window.__ModuleLoader__.load({
           },
           { passive: false },
         );
+        // 整个遮罩都能拖：空白处按下也能移动图，不必精准抓在细线或节点上。
         let start = null;
-        svg.addEventListener('pointerdown', (event) => {
+        box.addEventListener('pointerdown', (event) => {
+          if (event.target && event.target.closest && event.target.closest('button')) return;
           start = { x: event.clientX - tx, y: event.clientY - ty };
-          svg.setAttribute('data-dragging', '1');
-          if (svg.setPointerCapture) svg.setPointerCapture(event.pointerId);
+          box.setAttribute('data-dragging', '1');
+          if (box.setPointerCapture) box.setPointerCapture(event.pointerId);
         });
-        svg.addEventListener('pointermove', (event) => {
+        box.addEventListener('pointermove', (event) => {
           if (!start) return;
           tx = event.clientX - start.x;
           ty = event.clientY - start.y;
@@ -1784,13 +1787,13 @@ window.__ModuleLoader__.load({
         });
         const stop = () => {
           start = null;
-          svg.removeAttribute('data-dragging');
+          box.removeAttribute('data-dragging');
         };
-        svg.addEventListener('pointerup', stop);
-        svg.addEventListener('pointercancel', stop);
+        box.addEventListener('pointerup', stop);
+        box.addEventListener('pointercancel', stop);
         let fitted = false;
-        svg.addEventListener('dblclick', (event) => {
-          event.stopPropagation();
+        box.addEventListener('dblclick', (event) => {
+          if (event.target && event.target.closest && event.target.closest('button')) return;
           if (scale > 0.999) fit();
           else centerAt(1);
         });
@@ -1833,11 +1836,7 @@ window.__ModuleLoader__.load({
         box.appendChild(hint);
         box.appendChild(closeButton);
         box.appendChild(tools);
-        box.addEventListener('click', (event) => {
-          if (event.target === svg || (event.target && event.target.closest && event.target.closest('svg'))) return;
-          if (event.target === closeButton) return;
-          closeZoom();
-        });
+        // 不再「点空白关闭」：只有 × 或 Esc 才关，避免拖拽途中手抖丢失视图。
         document.body.appendChild(box);
         document.addEventListener('keydown', onKey);
         zoomBox = box;
