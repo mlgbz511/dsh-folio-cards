@@ -48,4 +48,25 @@ assert.ok(client.includes("setAttribute(MERMAID_SEEN, 'failed')"), 'fail-open on
 assert.ok(client.includes('mermaid.render'), 'renders through mermaid.render');
 assert.ok(!/eval\(/.test(client), 'no eval in client');
 
+
+// 4) 检测启发式：DSH 不暴露语言，所以既要认 language-mermaid，也要认内容开头
+let clientMod = null;
+globalThis.window = { __ModuleLoader__: { load: (m) => { clientMod = m; } } };
+globalThis.document = {
+  createElement: () => ({ setAttribute() {}, style: {}, appendChild() {}, querySelector: () => null }),
+  head: { appendChild() {} },
+  body: { appendChild() {}, removeChild() {} },
+  querySelectorAll: () => [],
+};
+globalThis.MutationObserver = class { observe() {} disconnect() {} };
+await import('../client.js');
+const api = clientMod.factory(() => ({ createElement: () => ({}), useState: (v) => [v, () => {}], useMemo: (fn) => fn() }));
+const { isMermaid } = api.__test;
+
+assert.ok(isMermaid({ className: 'language-mermaid', textContent: '' }), 'class wins');
+assert.ok(isMermaid({ className: '', textContent: 'flowchart TB\n  A --> B' }), 'flowchart head');
+assert.ok(isMermaid({ className: '', textContent: '  sequenceDiagram\n  A->>B: hi' }), 'sequenceDiagram head');
+assert.ok(!isMermaid({ className: 'language-js', textContent: 'const a = 1' }), 'plain js not mermaid');
+assert.ok(!isMermaid({ className: '', textContent: 'graphical user interface notes' }), 'prefix must be a word boundary');
+
 console.log('MERMAID-OK');

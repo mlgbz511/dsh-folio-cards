@@ -731,6 +731,7 @@ window.__ModuleLoader__.load({
   border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
   background: var(--dsw-alias-bg-layer-1); overflow: auto; }
 .rc-mermaid svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+.rc-mermaid-note { margin: -6px 0 14px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
 
 `;
 
@@ -1427,7 +1428,20 @@ window.__ModuleLoader__.load({
      */
     const MERMAID_URL = '/folio-cards/mermaid.min.js';
     const MERMAID_SEEN = 'data-folio-mermaid';
+    // DSH 不把围栏的语言写进 class（未知语言一律显示「代码块」），所以只能靠内容判定。
+    const MERMAID_HEAD = /^\s*(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey|gitGraph|mindmap|timeline|quadrantChart|sankey|C4Context|C4Container|block-beta)\b/;
     let mermaidPending = null;
+
+    function isMermaid(code) {
+      const element = code;
+      const className = element && typeof element.className === 'string' ? element.className : '';
+      if (/language-mermaid/.test(className)) return true;
+      const parent = element && element.parentElement;
+      const parentLang = parent && parent.getAttribute && (parent.getAttribute('data-language') || parent.getAttribute('data-lang'));
+      if (parentLang && String(parentLang).toLowerCase() === 'mermaid') return true;
+      const source = (element && element.textContent) || '';
+      return MERMAID_HEAD.test(source);
+    }
 
     function loadMermaid() {
       if (window.mermaid) return Promise.resolve(window.mermaid);
@@ -1451,7 +1465,8 @@ window.__ModuleLoader__.load({
     function installMermaid() {
       let started = false;
       const upgrade = async () => {
-        const nodes = Array.from(document.querySelectorAll('pre code.language-mermaid'));
+        const nodes = Array.from(document.querySelectorAll('pre code'))
+          .filter((code) => isMermaid(code) && !(code.parentElement && code.parentElement.getAttribute(MERMAID_SEEN)));
         for (const code of nodes) {
           const pre = code.parentElement;
           if (!pre || pre.getAttribute(MERMAID_SEEN)) continue;
@@ -1469,7 +1484,12 @@ window.__ModuleLoader__.load({
             box.innerHTML = svg;
             pre.replaceWith(box);
           } catch (error) {
+            // 失败只降级：原代码块留着，另附一行小字说明原因，方便定位（不弹窗、不改其它内容）。
             pre.setAttribute(MERMAID_SEEN, 'failed');
+            const note = document.createElement('div');
+            note.className = 'rc-mermaid-note';
+            note.textContent = 'mermaid 未能渲染：' + String((error && error.message) || error).slice(0, 160);
+            pre.after(note);
           }
         }
       };
@@ -1624,6 +1644,7 @@ window.__ModuleLoader__.load({
         tokenizeCode: tokenizeCode,
         CodeBlock: CodeBlock,
         VerdictBlock: VerdictBlock,
+        isMermaid: isMermaid,
       },
       apply(ctx) {
         const style = document.createElement('style');
