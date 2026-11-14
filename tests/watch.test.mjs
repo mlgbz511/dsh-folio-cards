@@ -79,5 +79,13 @@ assert.ok(usage.text.includes('当前深度'), 'no-arg form reports current dept
 const bad = await command.handler({ rawInput: 'detailed' });
 assert.equal(bad.kind, 'error', 'unknown depth rejected');
 
+// 数字别名：/depth 2 = balanced，且写回文件
+const digit = await command.handler({ rawInput: '2' });
+assert.equal(digit.kind, 'success', '/depth 2 accepted');
+assert.equal(mod.depthInPatch(fs.readFileSync(patch, 'utf8')), 'balanced', 'digit alias written back');
+const zero = await command.handler({ rawInput: '0' });
+assert.equal(zero.kind, 'success', '/depth 0 accepted');
+assert.equal(mod.depthInPatch(fs.readFileSync(patch, 'utf8')), 'auto', '0 writes auto');
+
 fs.rmSync(home, { recursive: true, force: true });
 console.log('WATCH-OK');

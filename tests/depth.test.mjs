@@ -25,7 +25,7 @@ const capture = (config) => {
 };
 
 assert.ok(mod.Config, 'Config is exported');
-assert.equal(mod.Config({}).depth, 'auto', 'Config defaults to auto');
+assert.equal(mod.Config({}).depth, 'verbose', 'Config defaults to verbose');
 
 const texts = {
   verbose: capture({ depth: 'verbose' }),
@@ -59,8 +59,16 @@ for (const [name, text] of Object.entries(texts)) {
 }
 
 // 非法值回落 auto，绝不抛异常
-for (const bad of [{ depth: 'detailed' }, { depth: 'AUTO ' }, { depth: 42 }, {}, undefined]) {
-  assert.equal(capture(bad), texts.auto, 'invalid depth falls back to auto: ' + JSON.stringify(bad));
+assert.equal(capture({ depth: 'AUTO ' }), texts.auto, 'case and padding tolerated for words');
+for (const bad of [{ depth: 'detailed' }, { depth: 'AUTOISH' }, { depth: 42 }, {}, undefined]) {
+  assert.equal(capture(bad), texts.verbose, 'invalid depth falls back to verbose: ' + JSON.stringify(bad));
 }
+
+// 数字别名：1 详尽 / 2 适中 / 3 精简 / 0 自适应
+assert.equal(capture({ depth: '1' }), texts.verbose, '1 maps to verbose');
+assert.equal(capture({ depth: '2' }), texts.balanced, '2 maps to balanced');
+assert.equal(capture({ depth: '3' }), texts.concise, '3 maps to concise');
+assert.equal(capture({ depth: '0' }), texts.auto, '0 maps to auto');
+assert.equal(capture({ depth: ' 1 ' }), texts.verbose, 'whitespace tolerated');
 
 console.log('DEPTH-OK');

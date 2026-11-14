@@ -129,12 +129,16 @@ const DEPTH_GUIDE = {
 };
 
 export const Config = Schema.object({
-  depth: Schema.string().default('auto'),
+  depth: Schema.string().default('verbose'),
 });
 
+/** 数字别名：1 详尽（默认）/ 2 适中 / 3 精简 / 0 自适应。 */
+const DEPTH_ALIASES = { '0': 'auto', '1': 'verbose', '2': 'balanced', '3': 'concise' };
+
 function depthOf(config) {
-  const value = config && typeof config.depth === 'string' ? config.depth.trim().toLowerCase() : '';
-  return DEPTHS.indexOf(value) >= 0 ? value : 'auto';
+  const raw = config && typeof config.depth === 'string' ? config.depth.trim().toLowerCase() : '';
+  if (DEPTH_ALIASES[raw]) return DEPTH_ALIASES[raw];
+  return DEPTHS.indexOf(raw) >= 0 ? raw : 'verbose';
 }
 
 function guideFor(depth) {
@@ -428,23 +432,24 @@ export function apply(ctx, config) {
   ctx.inject(['commands'], (cmdCtx) =>
     cmdCtx.commands.register({
       name: 'depth',
-      description: '切换本插件的输出深度（热生效并写回 cordis.patch.yml）。不带参数显示当前档。',
-      input: { hint: '<verbose|balanced|concise|auto>' },
+      description: '切换本插件的输出深度：1 详尽（默认）/ 2 适中 / 3 精简 / 0 自适应。热生效并写回 cordis.patch.yml；不带参数显示当前档。',
+      input: { hint: '<1|2|3|0>' },
       async handler(invocation) {
         const raw = String((invocation && invocation.rawInput) || '').trim().toLowerCase();
         if (!raw) {
-          return { kind: 'success', text: '当前深度：' + live.depth + '（可选：' + DEPTHS.join(' | ') + '）' };
+          return { kind: 'success', text: '当前深度：' + live.depth + '（1 详尽 / 2 适中 / 3 精简 / 0 自适应）' };
         }
-        if (DEPTHS.indexOf(raw) < 0) {
-          return { kind: 'error', text: '未知深度：' + raw + '（可选：' + DEPTHS.join(' | ') + '）' };
+        const picked = DEPTH_ALIASES[raw] || (DEPTHS.indexOf(raw) >= 0 ? raw : null);
+        if (!picked) {
+          return { kind: 'error', text: '未知深度：' + raw + '（1 详尽 / 2 适中 / 3 精简 / 0 自适应）' };
         }
-        live.depth = raw;
+        live.depth = picked;
         mount();
         const written = [];
         for (const file of patchFiles()) {
           try {
             const text = readFileSync(file, 'utf8');
-            const next = setDepthInPatch(text, raw);
+            const next = setDepthInPatch(text, picked);
             if (next !== text) {
               writeFileSync(file, next);
               written.push(file);
@@ -454,7 +459,7 @@ export function apply(ctx, config) {
         return {
           kind: 'success',
           text:
-            '深度已切到 ' + raw + '，' +
+            '深度已切到 ' + picked + '，' +
             (written.length
               ? '并写回 ' + written.length + ' 个 patch 文件，下一条回答生效。'
               : '仅本次运行生效（未找到可写的 patch 文件）。'),
