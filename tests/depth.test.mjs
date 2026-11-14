@@ -2,8 +2,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 
-// ponytail: 宿主包 @deepseek-ai/schemastery 只存在于 DSH profile 里，
-// 测试时在仓库内挂一个 gitignore 掉的 node_modules 链接。装回 profile 后即不再需要。
+// ponytail: 宿主包 @deepseek-ai/schemastery 只存在于 DSH profile，测试时在仓库内挂链接。
 const repo = path.resolve(import.meta.dirname, '..');
 const linkDir = path.join(repo, 'node_modules', '@deepseek-ai');
 const target = 'C:/Users/MTL/.dsh/profiles/desktop/node_modules/@deepseek-ai/schemastery';
@@ -13,62 +12,37 @@ if (!fs.existsSync(path.join(linkDir, 'schemastery')) && fs.existsSync(target)) 
 }
 
 const mod = await import('../index.js');
+
+// 深度锁死：任何配置都注入同一份「全量详尽」提示词
 const capture = (config) => {
-  const seen = [];
+  const sections = [];
+  let commandRegistrations = 0;
   mod.apply({
     effect: (fn) => { const out = fn(); return typeof out === 'function' ? out : () => {}; },
-    inject: (deps, fn) => fn({ commands: { register: () => () => {} } }),
-    systemPrompt: { section: (spec) => { seen.push(spec); return () => {}; } },
+    inject: (deps, fn) => { fn({ commands: { register: () => { commandRegistrations += 1; return () => {}; } } }); },
+    systemPrompt: { section: (spec) => { sections.push(spec); return () => {}; } },
     tools: { register: () => () => {} },
   }, config);
-  return seen.find((s) => s.name === 'folio-cards')?.text ?? '';
+  return { text: sections.find((spec) => spec.name === 'folio-cards')?.text ?? '', commandRegistrations };
 };
 
-assert.ok(mod.Config, 'Config is exported');
-assert.equal(mod.Config({}).depth, 'verbose', 'Config defaults to verbose');
+const guides = ['verbose', 'concise', '1', '3', 'auto', 'bogus', undefined].map((depth) => capture({ depth }).text);
+assert.equal(new Set(guides).size, 1, 'every depth setting yields the same guide');
 
-const texts = {
-  verbose: capture({ depth: 'verbose' }),
-  balanced: capture({ depth: 'balanced' }),
-  concise: capture({ depth: 'concise' }),
-  auto: capture({ depth: 'auto' }),
-};
+const guide = guides[0];
+assert.ok(guide.length > 500, 'guide is present');
 
-// 四档互不相同
-const values = new Set(Object.values(texts));
-assert.equal(values.size, 4, 'all four depths produce distinct guidance');
+// 该有的：完整输出、不截断
+assert.ok(guide.includes('Answer in full'), 'states the full-output rule');
+assert.ok(guide.includes('Never compress'), 'forbids compressing to fit the card');
+assert.ok(guide.includes('never truncate it'), 'code is never truncated');
 
-// 关键语义
-assert.ok(texts.verbose.includes('no length cap'), 'verbose allows long prose');
-assert.ok(texts.verbose.includes('rejected'), 'verbose asks for rejected alternatives');
-assert.ok(texts.balanced.includes('three or four short paragraphs'), 'balanced sets a paragraph budget');
-assert.ok(texts.concise.includes('two short sentences'), 'concise keeps the old two-sentence rule');
-assert.ok(texts.auto.includes('chosen at runtime'), 'auto is decided at runtime');
-assert.ok(texts.auto.includes('concise') && texts.auto.includes('balanced') && texts.auto.includes('verbose'), 'auto names all three choices');
-
-// 长度关系：详尽的提示词最长，精简最短
-assert.ok(texts.verbose.length > texts.balanced.length, 'verbose guidance is longer than balanced');
-assert.ok(texts.balanced.length > texts.concise.length, 'balanced guidance is longer than concise');
-
-// 每档都保留结构化块规则，防止拼接丢段
-for (const [name, text] of Object.entries(texts)) {
-  assert.ok(text.includes('table'), name + ' keeps the table rule');
-  assert.ok(text.includes('verdict'), name + ' keeps the verdict rule');
-  assert.ok(text.includes('code block'), name + ' keeps the code rule');
-  assert.ok(text.includes('must not restate the prose'), name + ' keeps the no-restate rule');
+// 不该有的：任何「压缩输出」的说法
+for (const banned of ['two short sentences', 'Depth: ', '3-4 short paragraphs', 'three or four short paragraphs', '24 lines or fewer', 'about 4 blocks']) {
+  assert.ok(!guide.includes(banned), 'no compression instruction: ' + banned);
 }
 
-// 非法值回落 auto，绝不抛异常
-assert.equal(capture({ depth: 'AUTO ' }), texts.auto, 'case and padding tolerated for words');
-for (const bad of [{ depth: 'detailed' }, { depth: 'AUTOISH' }, { depth: 42 }, {}, undefined]) {
-  assert.equal(capture(bad), texts.verbose, 'invalid depth falls back to verbose: ' + JSON.stringify(bad));
-}
-
-// 数字别名：1 详尽 / 2 适中 / 3 精简 / 0 自适应
-assert.equal(capture({ depth: '1' }), texts.verbose, '1 maps to verbose');
-assert.equal(capture({ depth: '2' }), texts.balanced, '2 maps to balanced');
-assert.equal(capture({ depth: '3' }), texts.concise, '3 maps to concise');
-assert.equal(capture({ depth: '0' }), texts.auto, '0 maps to auto');
-assert.equal(capture({ depth: ' 1 ' }), texts.verbose, 'whitespace tolerated');
+// 命令与热重载一并撤掉
+assert.equal(capture({ depth: 'concise' }).commandRegistrations, 0, 'no /depth command registered');
 
 console.log('DEPTH-OK');

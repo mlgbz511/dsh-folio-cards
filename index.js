@@ -7,8 +7,6 @@
  * (MALFORMED_RESPONSE), while a malformed fence merely stays visible as source.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync, watch, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import Schema from '@deepseek-ai/schemastery';
 
 const REGISTER_TOOL = false;
@@ -56,6 +54,8 @@ const BASE_GUIDE = [
   '```',
   '',
   'Rules:',
+  '- Answer in full: write the complete explanation the question deserves. Never compress prose, tables',
+  '  or code to make the card smaller.',
   '- At most one card per reply, placed at the end. A short factual answer may be the card alone.',
   '- The card carries the verdict, the comparison or the code. It must not restate the prose; the',
   '  reasoning belongs in the prose and is never compressed to fit the card.',
@@ -69,8 +69,6 @@ const BASE_GUIDE = [
   '  kv, chips, timeline (events: [{time, title, detail}]), image (url + alt + caption + credit),',
   '  table (headers + rows of plain strings), code (language + code), verdict (one sentence), and',
   '  divider.',
-  '- Short answer: about 4 blocks. Long-form article: 6-9 blocks. More blocks with short strings beats',
-  '  fewer blocks with long ones.',
   '- A card about a person, place, work, event or product should carry one image when one is easy to',
   '  find. Look it up before writing the block: curl',
   '  "https://en.wikipedia.org/w/api.php?action=query&titles=NAME&prop=pageimages&format=json&pithumbsize=1000"',
@@ -92,94 +90,18 @@ const BASE_GUIDE = [
   '- verdict: when the answer hinges on one root cause or one decision, open the card with a verdict',
   '  block — one sentence, no hedging. Use callout for side notes and caveats instead.',
   '- code: pasted code always goes in a code block with its language, never inside paragraph text;',
-  '  keep it to 24 lines or fewer and cut the rest. Inline identifiers stay inline with backticks.',
+  '  never truncate it. Inline identifiers stay inline with backticks.',
   '- Every string is plain text: no markdown, no bullet characters. Write in the user language.',
   '- Skip the card for short factual replies, code or file work, status reports and questions back to',
   '  the user.',
 ];
 
-const DEPTHS = ['verbose', 'balanced', 'concise', 'auto'];
-
-const DEPTH_GUIDE = {
-  concise: [
-    '## Depth: concise',
-    'Prose stays at two short sentences or fewer. The card is the answer: everything the reader needs',
-    'sits inside its blocks. No preamble, no afterword.',
-  ],
-  balanced: [
-    '## Depth: balanced',
-    'Write three or four short paragraphs of reasoning first (the cause, the alternative you rejected,',
-    'the limit of the advice), then one card holding the verdict, the comparison table or the code.',
-    'The card repeats nothing from the prose.',
-  ],
-  verbose: [
-    '## Depth: verbose',
-    'Write the reasoning in full prose first, with no length cap: the causal chain, the alternatives you',
-    'rejected and why, the boundary where the advice stops. Then at most one card carrying only the',
-    'verdict, the comparison and the code. Never compress the analysis to fit the card.',
-  ],
-  auto: [
-    '## Depth: auto, chosen at runtime',
-    'Pick the depth before writing, from the shape of the question:',
-    '- one fact, one comparison, one snippet: concise — two sentences of prose, the card carries the answer;',
-    '- a why or a which-is-better: balanced — three or four paragraphs of reasoning, then one card;',
-    '- a diagnosis, a plan or a design decision: verbose — full reasoning, rejected options, boundaries, then one card.',
-    'Never pad a simple answer to look thorough, and never squeeze a complex one to fit the card.',
-  ],
-};
-
 export const Config = Schema.object({
-  depth: Schema.string().default('verbose'),
+  depth: Schema.string().default('locked'),
 });
 
-/** 数字别名：1 详尽（默认）/ 2 适中 / 3 精简 / 0 自适应。 */
-const DEPTH_ALIASES = { '0': 'auto', '1': 'verbose', '2': 'balanced', '3': 'concise' };
-
-function depthOf(config) {
-  const raw = config && typeof config.depth === 'string' ? config.depth.trim().toLowerCase() : '';
-  if (DEPTH_ALIASES[raw]) return DEPTH_ALIASES[raw];
-  return DEPTHS.indexOf(raw) >= 0 ? raw : 'verbose';
-}
-
-function guideFor(depth) {
-  return BASE_GUIDE.concat(DEPTH_GUIDE[depth] || DEPTH_GUIDE.auto).join('\n');
-}
-
-/** 从 cordis.patch.yml 文本里读本插件的 depth；读不到或非法一律返回 null。 */
-export function depthInPatch(text) {
-  if (typeof text !== 'string') return null;
-  const hit = /- id:\s*folio-cards\b[\s\S]{0,240}?depth:\s*([A-Za-z]+)/.exec(text);
-  if (!hit) return null;
-  const value = hit[1].toLowerCase();
-  return DEPTHS.indexOf(value) >= 0 ? value : null;
-}
-
-/** 把 patch 文本里本插件的 depth 改成给定值；没找到时原样返回。 */
-export function setDepthInPatch(text, depth) {
-  if (typeof text !== 'string' || DEPTHS.indexOf(depth) < 0) return text;
-  return text.replace(
-    /((?:- id:\s*folio-cards\b[\s\S]{0,240}?)depth:\s*)([A-Za-z]+)/,
-    (all, head) => head + depth,
-  );
-}
-
-/** 找出本机提到本插件的 patch 文件；一个都没有时返回空数组。 */
-export function patchFiles() {
-  const home = process.env.USERPROFILE || process.env.HOME || '';
-  const profiles = join(home, '.dsh', 'profiles');
-  const found = [];
-  try {
-    for (const name of readdirSync(profiles)) {
-      const file = join(profiles, name, 'cordis.patch.yml');
-      try {
-        if (!existsSync(file) || !statSync(file).isFile()) continue;
-        if (readFileSync(file, 'utf8').includes('dsh-folio-cards')) found.push(file);
-      } catch (error) {}
-    }
-  } catch (error) {}
-  return found;
-}
-
+// 深度已锁死：不论配置写什么，只注入下面这一份提示词。
+const GUIDE = BASE_GUIDE.join(String.fromCharCode(10));
 const PARAMETERS = {
   type: 'object',
   properties: {
@@ -388,8 +310,7 @@ function presentCall(args) {
 
 export const inject = ['tools', 'systemPrompt'];
 
-export function apply(ctx, config) {
-  const depth = depthOf(config);
+export function apply(ctx) {
   if (REGISTER_TOOL) ctx.effect(
     () =>
       ctx.tools.register({
@@ -407,92 +328,13 @@ export function apply(ctx, config) {
     'dsh-folio-cards: rich_card tool',
   );
 
-  // 提示词区段可热重挂：改 patch 里的 depth 后不必重启 App。
-  const live = { depth: depthOf(config), dispose: null };
-  const mount = () => {
-    if (live.dispose) live.dispose();
-    live.dispose = ctx.systemPrompt.section({
-      name: 'folio-cards',
-      order: 34,
-      text: guideFor(live.depth),
-    });
-  };
-
-  ctx.effect(() => {
-    mount();
-    return () => {
-      if (live.dispose) {
-        live.dispose();
-        live.dispose = null;
-      }
-    };
-  }, 'dsh-folio-cards: prompt guidance');
-
-  // 斜杠命令 /depth：改档 + 写回 patch，等价于手改配置文件但不用离开会话。
-  ctx.inject(['commands'], (cmdCtx) =>
-    cmdCtx.commands.register({
-      name: 'depth',
-      description: '切换本插件的输出深度：1 详尽（默认）/ 2 适中 / 3 精简 / 0 自适应。热生效并写回 cordis.patch.yml；不带参数显示当前档。',
-      input: { hint: '<1|2|3|0>' },
-      async handler(invocation) {
-        const raw = String((invocation && invocation.rawInput) || '').trim().toLowerCase();
-        if (!raw) {
-          return { kind: 'success', text: '当前深度：' + live.depth + '（1 详尽 / 2 适中 / 3 精简 / 0 自适应）' };
-        }
-        const picked = DEPTH_ALIASES[raw] || (DEPTHS.indexOf(raw) >= 0 ? raw : null);
-        if (!picked) {
-          return { kind: 'error', text: '未知深度：' + raw + '（1 详尽 / 2 适中 / 3 精简 / 0 自适应）' };
-        }
-        live.depth = picked;
-        mount();
-        const written = [];
-        for (const file of patchFiles()) {
-          try {
-            const text = readFileSync(file, 'utf8');
-            const next = setDepthInPatch(text, picked);
-            if (next !== text) {
-              writeFileSync(file, next);
-              written.push(file);
-            }
-          } catch (error) {}
-        }
-        return {
-          kind: 'success',
-          text:
-            '深度已切到 ' + picked + '，' +
-            (written.length
-              ? '并写回 ' + written.length + ' 个 patch 文件，下一条回答生效。'
-              : '仅本次运行生效（未找到可写的 patch 文件）。'),
-        };
-      },
-    }),
-  );
-
-  ctx.effect(() => {
-    let timer = null;
-    // 监听目录而不是文件：编辑器常常先写临时文件再 rename，直接 watch 文件会跟丢。
-    const watchers = patchFiles().map((file) =>
-      watch(dirname(file), { persistent: false }, (event, name) => {
-        if (name && String(name) !== 'cordis.patch.yml') return;
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => {
-          let text = '';
-          try {
-            text = readFileSync(file, 'utf8');
-          } catch (error) {
-            return;
-          }
-          const next = depthInPatch(text);
-          if (next && next !== live.depth) {
-            live.depth = next;
-            mount();
-          }
-        }, 250);
+  ctx.effect(
+    () =>
+      ctx.systemPrompt.section({
+        name: 'folio-cards',
+        order: 34,
+        text: GUIDE,
       }),
-    );
-    return () => {
-      if (timer) clearTimeout(timer);
-      for (const watcher of watchers) watcher.close();
-    };
-  }, 'dsh-folio-cards: depth watch');
+    'dsh-folio-cards: prompt guidance',
+  );
 }
