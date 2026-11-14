@@ -36,7 +36,8 @@ DSH 本身不认 `mermaid` 语言（前端包里 mermaid/dagre/flowchart 出现 
 
 1. 宿主半把 `vendor/mermaid.min.js` 用 `webServer.register` 暴露成 `/folio-cards/mermaid.min.js`；
 2. 客户端半发现有 `pre code.language-mermaid` 时，**首次按需**加载该脚本（同 origin），调用 `mermaid.render` 换成 `div.rc-mermaid > svg`；
-3. 任一环节失败（路由 404、脚本加载失败、语法错误、CSP 拦截）→ 保留原代码块，只打上 `data-folio-mermaid="failed"` 标记，**不影响其它内容**。
+3. 任一环节失败（路由 404、脚本加载失败、语法错误、CSP 拦截）→ 保留原代码块，只打上 `data-folio-mermaid="failed"` 标记，**不影响其它内容**；
+4. 图渲染出来后**点一下**进入全屏遮罩（可滚轮/缩放查看），点任意处或按 `Esc` 关闭；图块本身可 Tab 聚焦、回车打开。
 
 代价与出处：
 

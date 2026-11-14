@@ -731,6 +731,14 @@ window.__ModuleLoader__.load({
   border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
   background: var(--dsw-alias-bg-layer-1); overflow: auto; }
 .rc-mermaid svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+.rc-mermaid { cursor: zoom-in; }
+.rc-mermaid:focus-visible { outline: 2px solid var(--dsw-alias-state-warning-primary); outline-offset: 2px; }
+.rc-mermaid-zoom { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center;
+  justify-content: center; padding: 3vmin; background: color-mix(in oklab, #000 88%, transparent);
+  cursor: zoom-out; }
+.rc-mermaid-zoom svg { width: min(94vw, 1600px); height: auto; max-height: 94vh; filter: drop-shadow(0 8px 40px rgba(0,0,0,.5)); }
+.rc-mermaid-zoom-hint { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
+  font-size: 12px; color: #cfd3da; opacity: .8; }
 .rc-mermaid-note { margin: -6px 0 14px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
 
 `;
@@ -1488,6 +1496,9 @@ window.__ModuleLoader__.load({
               const box = document.createElement('div');
               box.className = 'rc-mermaid';
               box.setAttribute(MERMAID_SEEN, 'ok');
+              box.setAttribute('role', 'button');
+              box.setAttribute('tabindex', '0');
+              box.setAttribute('aria-label', 'mermaid 图，点击放大');
               box.innerHTML = svg;
               shell.replaceWith(box);
             } catch (error) {
@@ -1503,6 +1514,52 @@ window.__ModuleLoader__.load({
         }
       };
 
+      // 点图放大：克隆一份 SVG 铺到全屏遮罩里，点任意处或 Esc 关闭；不改原图。
+      let zoomBox = null;
+      const closeZoom = () => {
+        if (!zoomBox) return;
+        zoomBox.remove();
+        zoomBox = null;
+        document.removeEventListener('keydown', onKey);
+      };
+      const onKey = (event) => {
+        if (event.key === 'Escape') closeZoom();
+      };
+      const openZoom = (source) => {
+        closeZoom();
+        const box = document.createElement('div');
+        box.className = 'rc-mermaid-zoom';
+        const hint = document.createElement('div');
+        hint.className = 'rc-mermaid-zoom-hint';
+        hint.textContent = '点击任意处或按 Esc 关闭';
+        const svg = source.cloneNode(true);
+        svg.removeAttribute('style');
+        box.appendChild(svg);
+        box.appendChild(hint);
+        box.addEventListener('click', closeZoom);
+        document.body.appendChild(box);
+        document.addEventListener('keydown', onKey);
+        zoomBox = box;
+      };
+      const onClick = (event) => {
+        if (zoomBox) return;
+        const figure = event.target && event.target.closest ? event.target.closest('.rc-mermaid') : null;
+        if (!figure) return;
+        const svg = figure.querySelector('svg');
+        if (svg) openZoom(svg);
+      };
+      const onEnter = (event) => {
+        const figure = event.target && event.target.closest ? event.target.closest('.rc-mermaid') : null;
+        if (!figure || (event.key !== 'Enter' && event.key !== ' ')) return;
+        const svg = figure.querySelector('svg');
+        if (svg) {
+          event.preventDefault();
+          openZoom(svg);
+        }
+      };
+      document.addEventListener('click', onClick);
+      document.addEventListener('keydown', onEnter);
+
       const schedule = () => {
         clearTimeout(timer);
         timer = setTimeout(() => void upgrade(), 150);
@@ -1513,6 +1570,9 @@ window.__ModuleLoader__.load({
       return () => {
         clearTimeout(timer);
         observer.disconnect();
+        document.removeEventListener('click', onClick);
+        document.removeEventListener('keydown', onEnter);
+        closeZoom();
       };
     }
 

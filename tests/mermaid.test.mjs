@@ -50,6 +50,14 @@ assert.ok(client.includes("setAttribute(MERMAID_SEEN, 'failed')"), 'fail-open on
 assert.ok(client.includes('mermaid.render'), 'renders through mermaid.render');
 assert.ok(!/eval\(/.test(client), 'no eval in client');
 
+// 4) 点图放大：全屏遮罩、Esc 关闭、键盘可开
+assert.ok(client.includes("'rc-mermaid-zoom'"), 'zoom overlay exists');
+assert.ok(client.includes("event.key === 'Escape'") || client.includes("key === 'Escape'"), 'Esc closes the overlay');
+assert.ok(client.includes("addEventListener('click', onClick)"), 'click opens the overlay');
+assert.ok(client.includes("removeEventListener('click', onClick)"), 'listener removed on dispose');
+assert.ok(client.includes("setAttribute('role', 'button')"), 'figure is focusable');
+assert.ok(client.includes("aria-label', 'mermaid 图，点击放大'"), 'figure is labelled');
+
 
 // 4) 检测启发式：DSH 不暴露语言，所以既要认 language-mermaid，也要认内容开头
 let clientMod = null;
