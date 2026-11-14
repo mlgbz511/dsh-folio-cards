@@ -755,13 +755,17 @@ window.__ModuleLoader__.load({
 .rc-mermaid { margin: 14px 0; padding: 12px; border-radius: 8px;
   border: 1px solid color-mix(in oklab, var(--dsw-alias-border-l1) 70%, transparent);
   background: var(--dsw-alias-bg-layer-1); overflow: auto; }
-.rc-mermaid svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+/* 不把图压到容器宽度：保持自然尺寸，容器负责滚动，字才读得清。 */
+.rc-mermaid svg { max-width: none; width: auto; height: auto; display: block; margin: 0 auto; }
+.rc-mermaid { max-height: 70vh; }
 .rc-mermaid { cursor: zoom-in; }
 .rc-mermaid:focus-visible { outline: 2px solid var(--dsw-alias-state-warning-primary); outline-offset: 2px; }
 .rc-mermaid-zoom { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center;
   justify-content: center; padding: 3vmin; background: color-mix(in oklab, #000 88%, transparent);
   cursor: zoom-out; }
-.rc-mermaid-zoom svg { width: min(94vw, 1600px); height: auto; max-height: 94vh; filter: drop-shadow(0 8px 40px rgba(0,0,0,.5)); }
+.rc-mermaid-zoom svg { max-width: none; height: auto; filter: drop-shadow(0 8px 40px rgba(0,0,0,.5));
+  transform-origin: center center; will-change: transform; touch-action: none; cursor: grab; }
+.rc-mermaid-zoom svg[data-dragging='1'] { cursor: grabbing; }
 .rc-mermaid-zoom-hint { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%);
   font-size: 12px; color: #cfd3da; opacity: .8; }
 .rc-mermaid-note { margin: -6px 0 14px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
@@ -1518,7 +1522,20 @@ window.__ModuleLoader__.load({
             if (!source) continue;
             try {
               const mermaid = await loadMermaid();
-              mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
+              // useMaxWidth:false 是不被压扁的关键：mermaid 默认输出 width="100%"，
+              // 大图会被等比缩到卡片宽度，字就小到不可读。关掉它，SVG 保持自然尺寸 + 滚动。
+              mermaid.initialize({
+                startOnLoad: false,
+                theme: 'dark',
+                securityLevel: 'strict',
+                useMaxWidth: false,
+                themeVariables: { fontSize: '15px', fontFamily: 'system-ui, -apple-system, Segoe UI, Microsoft YaHei, sans-serif' },
+                flowchart: { useMaxWidth: false, curve: 'basis', nodeSpacing: 36, rankSpacing: 56, padding: 10 },
+                sequence: { useMaxWidth: false },
+                class: { useMaxWidth: false },
+                state: { useMaxWidth: false },
+                er: { useMaxWidth: false },
+              });
               const id = 'rc-mermaid-' + Math.random().toString(36).slice(2, 10);
               const { svg } = await mermaid.render(id, source);
               const box = document.createElement('div');
@@ -1559,12 +1576,59 @@ window.__ModuleLoader__.load({
         box.className = 'rc-mermaid-zoom';
         const hint = document.createElement('div');
         hint.className = 'rc-mermaid-zoom-hint';
-        hint.textContent = '点击任意处或按 Esc 关闭';
+        hint.textContent = '滚轮缩放 · 拖拽平移 · 双击复位 · 点背景或 Esc 关闭';
         const svg = source.cloneNode(true);
         svg.removeAttribute('style');
+        svg.style.transform = 'scale(1)';
+
+        // 滚轮缩放 + 拖拽平移：大图放大后仍能移动到想看的位置。
+        let scale = 1;
+        let tx = 0;
+        let ty = 0;
+        const sync = () => {
+          svg.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+        };
+        box.addEventListener(
+          'wheel',
+          (event) => {
+            event.preventDefault();
+            scale = Math.min(6, Math.max(0.6, scale * (event.deltaY < 0 ? 1.12 : 0.89)));
+            sync();
+          },
+          { passive: false },
+        );
+        let start = null;
+        svg.addEventListener('pointerdown', (event) => {
+          start = { x: event.clientX - tx, y: event.clientY - ty };
+          svg.setAttribute('data-dragging', '1');
+          if (svg.setPointerCapture) svg.setPointerCapture(event.pointerId);
+        });
+        svg.addEventListener('pointermove', (event) => {
+          if (!start) return;
+          tx = event.clientX - start.x;
+          ty = event.clientY - start.y;
+          sync();
+        });
+        const stop = () => {
+          start = null;
+          svg.removeAttribute('data-dragging');
+        };
+        svg.addEventListener('pointerup', stop);
+        svg.addEventListener('pointercancel', stop);
+        svg.addEventListener('dblclick', (event) => {
+          event.stopPropagation();
+          scale = 1;
+          tx = 0;
+          ty = 0;
+          sync();
+        });
+
         box.appendChild(svg);
         box.appendChild(hint);
-        box.addEventListener('click', closeZoom);
+        box.addEventListener('click', (event) => {
+          if (event.target === svg || (event.target && event.target.closest && event.target.closest('svg'))) return;
+          closeZoom();
+        });
         document.body.appendChild(box);
         document.addEventListener('keydown', onKey);
         zoomBox = box;

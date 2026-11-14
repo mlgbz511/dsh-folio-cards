@@ -98,6 +98,8 @@ const BASE_GUIDE = [
   '- code: pasted code always goes in a code block with its language, never inside paragraph text;',
   '  never truncate it. Inline identifiers stay inline with backticks.',
   '- Every string is plain text: no markdown, no bullet characters. Write in the user language.',
+  '- Diagrams: keep a mermaid graph under about 20 nodes and 3 levels. Above that, split it or use a',
+  '  table instead — a 40-node graph is unreadable at any zoom.',
   '- The only exemptions are the three above. File edits and status updates may still end with a card',
   '  when the reply explains a decision, a comparison or a root cause.',
 ];

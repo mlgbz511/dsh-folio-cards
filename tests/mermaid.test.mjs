@@ -57,6 +57,13 @@ assert.ok(client.includes("addEventListener('click', onClick)"), 'click opens th
 assert.ok(client.includes("removeEventListener('click', onClick)"), 'listener removed on dispose');
 assert.ok(client.includes("setAttribute('role', 'button')"), 'figure is focusable');
 assert.ok(client.includes("aria-label', 'mermaid 图，点击放大'"), 'figure is labelled');
+// 可读性：不被压到容器宽、放大后可缩放/平移
+assert.ok(client.includes('useMaxWidth: false'), 'mermaid keeps its natural size');
+assert.ok(client.includes('fontSize'), 'theme sets a readable font size');
+assert.ok(client.includes("'wheel'"), 'overlay zooms with the wheel');
+assert.ok(client.includes("'pointerdown'"), 'overlay pans by dragging');
+assert.ok(client.includes('dblclick'), 'double click resets the view');
+assert.ok(!client.includes('max-width: 100%; height: auto; display: block'), 'inline svg is no longer squeezed');
 
 
 // 4) 检测启发式：DSH 不暴露语言，所以既要认 language-mermaid，也要认内容开头

@@ -37,7 +37,9 @@ DSH 本身不认 `mermaid` 语言（前端包里 mermaid/dagre/flowchart 出现 
 1. 宿主半把 `vendor/mermaid.min.js` 用 `webServer.register` 暴露成 `/folio-cards/mermaid.min.js`；
 2. 客户端半发现有 `pre code.language-mermaid` 时，**首次按需**加载该脚本（同 origin），调用 `mermaid.render` 换成 `div.rc-mermaid > svg`；
 3. 任一环节失败（路由 404、脚本加载失败、语法错误、CSP 拦截）→ 保留原代码块，只打上 `data-folio-mermaid="failed"` 标记，**不影响其它内容**；
-4. 图渲染出来后**点一下**进入全屏遮罩（可滚轮/缩放查看），点任意处或按 `Esc` 关闭；图块本身可 Tab 聚焦、回车打开。
+4. 可见性优先于塞进卡片：SVG **保持自然尺寸**（`useMaxWidth:false`，字号 15px），容器横向/纵向滚动，不把大图等比压小；
+5. 图渲染出来后**点一下**进入全屏遮罩：滚轮缩放（0.6×–6×）、拖拽平移、双击复位，点背景或按 `Esc` 关闭；图块可 Tab 聚焦、回车打开；
+6. 提示词里限定了图规模（约 ≤20 节点、≤3 层），超了就该拆图或改用表格 —— 40 节点的图任何缩放都读不清。
 
 代价与出处：
 
