@@ -42,7 +42,9 @@ assert.ok(res.body && res.body.length > 1000000, 'route serves the whole bundle'
 
 // 3) 客户端：只接管 mermaid 围栏，失败必须保留原代码块
 const client = fs.readFileSync(path.join(repo, 'client.js'), 'utf8');
-assert.ok(client.includes("pre code.language-mermaid"), 'targets mermaid fences only');
+assert.ok(client.includes("querySelectorAll('pre')"), 'scans pre elements (DSH keeps the fence text there)');
+assert.ok(client.includes(".md-code-block"), 'replaces the whole code-block shell');
+assert.ok(client.includes("data-rc-claimed"), 'never touches a fence the card renderer already claimed');
 assert.ok(client.includes("'/folio-cards/mermaid.min.js'"), 'client loads the host route');
 assert.ok(client.includes("setAttribute(MERMAID_SEEN, 'failed')"), 'fail-open on render error');
 assert.ok(client.includes('mermaid.render'), 'renders through mermaid.render');

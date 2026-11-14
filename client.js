@@ -1428,19 +1428,19 @@ window.__ModuleLoader__.load({
      */
     const MERMAID_URL = '/folio-cards/mermaid.min.js';
     const MERMAID_SEEN = 'data-folio-mermaid';
-    // DSH 不把围栏的语言写进 class（未知语言一律显示「代码块」），所以只能靠内容判定。
+    // DSH 不把围栏语言写进 class（未知语言一律显示「代码块」），只能靠内容开头判定。
     const MERMAID_HEAD = /^\s*(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|journey|gitGraph|mindmap|timeline|quadrantChart|sankey|C4Context|C4Container|block-beta)\b/;
     let mermaidPending = null;
+    let mermaidBusy = false;
 
-    function isMermaid(code) {
-      const element = code;
-      const className = element && typeof element.className === 'string' ? element.className : '';
+    function isMermaid(element) {
+      if (!element) return false;
+      const className = typeof element.className === 'string' ? element.className : '';
       if (/language-mermaid/.test(className)) return true;
-      const parent = element && element.parentElement;
-      const parentLang = parent && parent.getAttribute && (parent.getAttribute('data-language') || parent.getAttribute('data-lang'));
-      if (parentLang && String(parentLang).toLowerCase() === 'mermaid') return true;
-      const source = (element && element.textContent) || '';
-      return MERMAID_HEAD.test(source);
+      const parent = element.parentElement;
+      const lang = parent && parent.getAttribute && (parent.getAttribute('data-language') || parent.getAttribute('data-lang'));
+      if (lang && String(lang).toLowerCase() === 'mermaid') return true;
+      return MERMAID_HEAD.test((element.textContent || ''));
     }
 
     function loadMermaid() {
@@ -1461,49 +1461,59 @@ window.__ModuleLoader__.load({
       return mermaidPending;
     }
 
-    /** 把 \`\`\`mermaid 围栏换成内联 SVG；任何失败都保留原代码块。 */
+    /** 真实结构：div.md-code-block > 横幅 + div[data-code-block-content] > pre。
+     *  换掉整个代码块外壳（不是只换 pre），失败则原样保留并在下方加一行说明。 */
     function installMermaid() {
-      let started = false;
+      let timer = 0;
+
       const upgrade = async () => {
-        const nodes = Array.from(document.querySelectorAll('pre code'))
-          .filter((code) => isMermaid(code) && !(code.parentElement && code.parentElement.getAttribute(MERMAID_SEEN)));
-        for (const code of nodes) {
-          const pre = code.parentElement;
-          if (!pre || pre.getAttribute(MERMAID_SEEN)) continue;
-          const source = (code.textContent || '').trim();
-          if (!source) continue;
-          pre.setAttribute(MERMAID_SEEN, 'pending');
-          try {
-            const mermaid = await loadMermaid();
-            mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
-            const id = 'rc-mermaid-' + Math.random().toString(36).slice(2, 10);
-            const { svg } = await mermaid.render(id, source);
-            const box = document.createElement('div');
-            box.className = 'rc-mermaid';
-            box.setAttribute(MERMAID_SEEN, 'ok');
-            box.innerHTML = svg;
-            pre.replaceWith(box);
-          } catch (error) {
-            // 失败只降级：原代码块留着，另附一行小字说明原因，方便定位（不弹窗、不改其它内容）。
-            pre.setAttribute(MERMAID_SEEN, 'failed');
-            const note = document.createElement('div');
-            note.className = 'rc-mermaid-note';
-            note.textContent = 'mermaid 未能渲染：' + String((error && error.message) || error).slice(0, 160);
-            pre.after(note);
+        if (mermaidBusy) return;
+        const pres = Array.from(document.querySelectorAll('pre')).filter(
+          (pre) => !pre.getAttribute(MERMAID_SEEN) && !pre.getAttribute('data-rc-claimed') && isMermaid(pre),
+        );
+        if (!pres.length) return;
+        mermaidBusy = true;
+        try {
+          for (const pre of pres) {
+            if (pre.getAttribute(MERMAID_SEEN)) continue;
+            pre.setAttribute(MERMAID_SEEN, 'pending');
+            const shell = (pre.closest && pre.closest('.md-code-block')) || pre;
+            const source = (pre.textContent || '').trim();
+            if (!source) continue;
+            try {
+              const mermaid = await loadMermaid();
+              mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
+              const id = 'rc-mermaid-' + Math.random().toString(36).slice(2, 10);
+              const { svg } = await mermaid.render(id, source);
+              const box = document.createElement('div');
+              box.className = 'rc-mermaid';
+              box.setAttribute(MERMAID_SEEN, 'ok');
+              box.innerHTML = svg;
+              shell.replaceWith(box);
+            } catch (error) {
+              pre.setAttribute(MERMAID_SEEN, 'failed');
+              const note = document.createElement('div');
+              note.className = 'rc-mermaid-note';
+              note.textContent = 'mermaid 未能渲染：' + String((error && error.message) || error).slice(0, 160);
+              shell.after(note);
+            }
           }
+        } finally {
+          mermaidBusy = false;
         }
       };
-      const kick = () => {
-        if (started) return;
-        started = true;
-        void upgrade();
+
+      const schedule = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => void upgrade(), 150);
       };
-      kick();
-      const observer = new MutationObserver(() => {
-        if (document.querySelector('pre code.language-mermaid:not([data-folio-mermaid])')) kick();
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-      return () => observer.disconnect();
+      schedule();
+      const observer = new MutationObserver(schedule);
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      return () => {
+        clearTimeout(timer);
+        observer.disconnect();
+      };
     }
 
     function installCardFences() {
