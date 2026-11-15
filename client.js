@@ -1556,6 +1556,23 @@ window.__ModuleLoader__.load({
       return (h >>> 0).toString(36);
     }
 
+    /** mermaid 解析失败时不抛异常，而是返回一张「Syntax error in text」红图，并且会把它**挂到 body**；
+     *  不识别的话它就一直浮在窗口角落，看起来像插件的锅。 */
+    function looksLikeMermaidError(svgText) {
+      return /Syntax error in text|mermaid version/i.test(String(svgText || ''));
+    }
+
+    function sweepMermaidErrors() {
+      try {
+        const strays = document.querySelectorAll(
+          'body > svg[id^="dmermaid"], body > svg[aria-roledescription], body > #dmermaid-error, body > .mermaid-error',
+        );
+        for (const node of strays) {
+          if (!node.closest || !node.closest('.rc-mermaid')) node.remove();
+        }
+      } catch (error) {}
+    }
+
     function cachedSvg(source) {
       const key = hashOf(source);
       if (MERMAID_MEMO.has(key)) return MERMAID_MEMO.get(key);
@@ -1661,7 +1678,7 @@ window.__ModuleLoader__.load({
               shell.replaceWith(placeholder);
               // 宿主优先：它渲染不占主线程；拿不到（服务未起/窗口起不来/超时）再本地渲染。
               const hosted = await hostSvg(source);
-              if (hosted) {
+              if (hosted && !looksLikeMermaidError(hosted)) {
                 mount(placeholder, hosted);
                 continue;
               }
@@ -1670,6 +1687,7 @@ window.__ModuleLoader__.load({
                 configureMermaid(mermaid);
                 const id = 'rc-mermaid-' + Math.random().toString(36).slice(2, 10);
                 const { svg } = await mermaid.render(id, source);
+                if (looksLikeMermaidError(svg)) throw new Error('mermaid 语法错误');
                 mount(placeholder, svg);
               } catch (inner) {
                 placeholder.replaceWith(shell);
@@ -1866,6 +1884,7 @@ window.__ModuleLoader__.load({
 
       const schedule = () => {
         clearTimeout(timer);
+        sweepMermaidErrors();
         // 先等流结束（160ms 静默），再把渲染排进空闲帧，避免和正文渲染抢主线程。
         timer = setTimeout(() => {
           if (typeof window.requestIdleCallback === 'function') {

@@ -122,6 +122,10 @@ assert.ok(client.includes("fontSize: '18px'"), 'labels are 18px');
 // 卡片里的图必须固定高度，双向适配，不把版面撑爆
 assert.ok(client.includes('max-height: min(46vh, 420px)'), 'inline preview has a fixed height cap');
 assert.ok(client.includes("content: '点击放大'"), 'inline preview hints that it can be opened');
+// mermaid 的语法错误是「红图」而不是异常，必须识别并清理，不能让它浮在窗口上
+assert.ok(client.includes('function looksLikeMermaidError'), 'error SVG is detected');
+assert.ok(client.includes('function sweepMermaidErrors'), 'stray error nodes are swept');
+assert.ok(client.includes("document.querySelectorAll('pre')"), 'scan still targets fences');
 assert.ok(/fontSize: '(1[6-9]|[2-9][0-9])px'/.test(client), 'labels are at least 16px');
 assert.ok(client.includes('getBoundingClientRect'), 'wheel zoom reads the live box');
 assert.ok(client.includes('1 - next / scale'), 'wheel zoom compensates the pan so the cursor stays put');

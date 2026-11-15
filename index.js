@@ -437,6 +437,10 @@ async function renderOnHost(source, origin) {
   });
   const result = await timed;
   if (!result || result.error) throw new Error((result && result.error) || 'render failed');
+  // 语法错误时 mermaid 返回的是红图而不是异常，当失败处理。
+  if (/Syntax error in text|mermaid version/i.test(String(result.svg || ''))) {
+    throw new Error('mermaid 语法错误');
+  }
   if (hostCache.size > 60) hostCache.clear();
   hostCache.set(key, result.svg);
   return result.svg;

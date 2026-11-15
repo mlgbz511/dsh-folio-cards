@@ -55,7 +55,7 @@ DSH 本身不认 `mermaid` 语言（前端包里 mermaid/dagre/flowchart 出现 
 
 1. 宿主半把 `vendor/mermaid.min.js` 用 `webServer.register` 暴露成 `/folio-cards/mermaid.min.js`；
 2. 客户端半发现有 `pre code.language-mermaid` 时，**首次按需**加载该脚本（同 origin），调用 `mermaid.render` 换成 `div.rc-mermaid > svg`；
-3. 任一环节失败（路由 404、脚本加载失败、语法错误、CSP 拦截）→ 保留原代码块，只打上 `data-folio-mermaid="failed"` 标记，**不影响其它内容**；
+3. 语法错误不会抛异常，而是返回一张「Syntax error in text」红图，并且**挂到 `body` 上**（这就是它浮在窗口左下角的原因）；插件会识别它当作失败处理，并定期清扫这些游离节点；任一环节失败（路由 404、脚本加载失败、语法错误、CSP 拦截）→ 保留原代码块，只打上 `data-folio-mermaid="failed"` 标记，**不影响其它内容**；
 4. 出图不卡主线程：渲染结果按源码哈希缓存（localStorage，键 `folio-mermaid-svg:<hash>`），第二次起直接注入 SVG；未缓存的图先放「正在绘制图…」占位（固定 180px 高，不跳动），再在 `requestIdleCallback` 的空闲帧里渲染，且只有滚进视口 240px 内才开始 —— 历史消息里的图不会一次性抢主线程；mermaid 只 initialize 一次；
 5. 卡片里的图是**固定高度预览**（`min(46vh, 420px)`，最少 200px，宽高双向适配、不裁切、不留大片空白），右下角有「点击放大」提示；要读细节就点开；
 6. 可见性优先于塞进卡片：SVG **保持自然尺寸**（`useMaxWidth:false`，字号 15px），容器横向/纵向滚动，不把大图等比压小；
