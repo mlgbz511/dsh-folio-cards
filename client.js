@@ -1565,10 +1565,17 @@ window.__ModuleLoader__.load({
     function sweepMermaidErrors() {
       try {
         const strays = document.querySelectorAll(
-          'body > svg[id^="dmermaid"], body > svg[aria-roledescription], body > #dmermaid-error, body > .mermaid-error',
+          'body > svg[id^="dmermaid"], body > svg[aria-roledescription], body > #dmermaid-error, body > .mermaid-error,' +
+          ' body > div[id^="drc-mermaid"], body > div[id^="dmermaid"], body > div:has(> svg[aria-roledescription="error"])',
         );
         for (const node of strays) {
           if (!node.closest || !node.closest('.rc-mermaid')) node.remove();
+        }
+        // mermaid 11 的失败图是 body 顶层 div（id = d + renderId），结构可能再变；
+        // 兜底按语义扫：body 子节点里含 error svg 的，只要不是图本身，删掉。
+        for (const node of Array.from(document.body.children)) {
+          if (node.classList && node.classList.contains('rc-mermaid')) continue;
+          if (node.querySelector && node.querySelector('svg[aria-roledescription="error"]')) node.remove();
         }
       } catch (error) {}
     }
@@ -1694,6 +1701,7 @@ window.__ModuleLoader__.load({
                 throw inner;
               }
             } catch (error) {
+              sweepMermaidErrors();
               pre.setAttribute(MERMAID_SEEN, 'failed');
               const note = document.createElement('div');
               note.className = 'rc-mermaid-note';

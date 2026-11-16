@@ -77,6 +77,9 @@ assert.ok(client.includes("'/folio-cards/mermaid.min.js'"), 'client loads the ho
 assert.ok(client.includes("setAttribute(MERMAID_SEEN, 'failed')"), 'fail-open on render error');
 assert.ok(client.includes('mermaid.render'), 'renders through mermaid.render');
 assert.ok(!/eval\(/.test(client), 'no eval in client');
+assert.ok(client.includes('svg[aria-roledescription="error"]'), 'sweeps mermaid 11 error wrapper (div#d<renderId>)');
+assert.ok(client.includes('body > div:has(> svg[aria-roledescription="error"])'), 'covers div-wrapped error svg');
+assert.ok(/catch \(error\) \{\s+sweepMermaidErrors\(\);/.test(client), 'sweeps immediately when a render fails');
 
 // 4) 点图放大：全屏遮罩、Esc 关闭、键盘可开
 assert.ok(client.includes("'rc-mermaid-zoom'"), 'zoom overlay exists');
